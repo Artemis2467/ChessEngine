@@ -191,35 +191,26 @@ class FindLegalMove:
             col = rook_pos % 8 if rook_pos % 8 != 0 else 8
 
             attack = self.moves.get_rook_bitboard(rook_pos)
-            overlapped_ally = attack.find_same(self.ally)
-            overlapped_foe = attack.find_same(self.foe)
-            overlapped_positions = set(overlapped_ally.get_pos()).union(set(overlapped_foe.get_pos()))
+            overlapped_ally = set(attack.find_same(self.ally).get_pos())
+            overlapped_foe = set(attack.find_same(self.foe).get_pos())
             blocked = []
-            # right
-            right = 0
-            for square in range(rook_pos, 8 * row + 1):
-                if square in overlapped_positions and not right:
-                    right = square
-                if right:
-                    blocked.append(square)
-            # left
-            left = 0
-            for square in range(rook_pos - 1, 8 * (row - 1), -1):
-                if square in overlapped_positions:
-                    left = square
-                    break
-            # up
-            up = 0
-            for square in range(rook_pos - 8, col - 1, -8):
-                if square in overlapped_positions:
-                    up = square
-                    break
-            # down
-            down = 0
-            for square in range(rook_pos + 8, 57 + col, 8):
-                if square in overlapped_positions:
-                    down = square
-                    break
+            direction_args = [
+                (rook_pos, 8 * row + 1), (rook_pos - 1, 8 * (row - 1), -1), (rook_pos - 8, col - 1, -8), (rook_pos + 8, 57 + col, 8)
+            ]
+            for direction in direction_args:
+                first_overlap = 0
+                for square in range(*direction):
+                    if (square in overlapped_ally or square in overlapped_foe) and not first_overlap:
+                        first_overlap = square
+                    if first_overlap:
+                        blocked.append(square)
+                if first_overlap in overlapped_foe:
+                    blocked.remove(first_overlap)
+            blocked = Bitboard(blocked)
+
+            attack.omit_same(blocked)
+
+            attacks[rook_pos] = attack 
 
         return attacks
 
@@ -238,7 +229,7 @@ class FindLegalMove:
 moves = StoreMoves()
 board = Board()
 legal_moves = FindLegalMove(board, moves, 'w')
-for move, bitboard in legal_moves.pawn_move(board.pieces['wp']).items():
+for move, bitboard in legal_moves.rook_move(board.pieces['wr']).items():
     print(move)
     print(bitboard)
 

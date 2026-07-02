@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 CORD_MAP_INT = {
    8 * row + col + 1: 1 << (64 - (8 * row + col + 1)) for col in range(0, 8) for row in range(0, 8)
 }
@@ -34,10 +36,10 @@ class Bitboard:
     def clear_cord(self, cord):
         self.board &= ~CORD_MAP_INT[cord]
 
-    def omit_same(self, bitboard):
+    def omit_same(self, bitboard: Bitboard):
         self.board &= ~ (bitboard.board & self.board)
 
-    def find_same(self, *args):
+    def find_same(self, *args: Bitboard):
         res = Bitboard([])
         res = self.copy()
         for arg in args:
