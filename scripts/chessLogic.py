@@ -214,8 +214,38 @@ class FindLegalMove:
 
         return attacks
 
-    def biship_move(self):
-        pass
+    def biship_move(self, biships: Bitboard)->dict:
+        positions = biships.get_pos()
+        attacks = {}
+        for biship_pos in positions:
+
+            attack = self.moves.get_biship_bitboard(biship_pos)
+            overlapped_ally = set(attack.find_same(self.ally).get_pos())
+            overlapped_foe = set(attack.find_same(self.foe).get_pos())
+            blocked = []
+            direction_args = [
+                (biship_pos, 0, -7), (biship_pos, 65, 9), (biship_pos, 0, -9), (biship_pos, 65, 7)
+            ]
+
+            for direction in direction_args:
+                first_overlap = 0
+                for square in range(*direction):
+                    if (square in overlapped_ally or square in overlapped_foe) and not first_overlap:
+                        first_overlap = square
+                    if first_overlap:
+                        blocked.append(square)
+                    if square % 8 == 0 or square % 8 == 1:
+                        break
+                    
+                if first_overlap in overlapped_foe:
+                    blocked.remove(first_overlap)
+            blocked = Bitboard(blocked)
+
+            attack.omit_same(blocked)
+
+            attacks[biship_pos] = attack
+                    
+        return attacks
 
     def queen_move(self):
         pass
@@ -229,7 +259,7 @@ class FindLegalMove:
 moves = StoreMoves()
 board = Board()
 legal_moves = FindLegalMove(board, moves, 'w')
-for move, bitboard in legal_moves.rook_move(board.pieces['wr']).items():
+for move, bitboard in legal_moves.biship_move(board.pieces['wb']).items():
     print(move)
     print(bitboard)
 
