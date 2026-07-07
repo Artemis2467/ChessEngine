@@ -115,23 +115,23 @@ class StoreMoves:
                 self.all_moves['p']['b'][pos] = {"move": Bitboard(bpawn_moves), "attack": Bitboard(bpawn_attacks), 'en_passant': Bitboard(en_passant)}
     
     def get_king_bitboard(self, pos: int)->dict[str, Bitboard]:
-        return self.all_moves['k'][pos]
+        return self.all_moves['k'][pos].copy()
     
     def get_knight_bitboard(self, pos: int)->Bitboard:
-        return self.all_moves['n'][pos]
+        return self.all_moves['n'][pos].copy()
     
     def get_pawn_bitboard(self, pos: int, color: str)->dict[str, Bitboard]:
-        return self.all_moves['p'][color][pos]
+        return self.all_moves['p'][color][pos].copy()
     
     # sliding pieces
     def get_rook_bitboard(self, pos: int)->Bitboard:
-        return self.all_moves['r'][pos]
+        return self.all_moves['r'][pos].copy()
     
     def get_biship_bitboard(self, pos: int)->Bitboard:
-        return self.all_moves['b'][pos]
+        return self.all_moves['b'][pos].copy()
     
     def get_queen_bitboard(self, pos: int)->Bitboard:
-        return self.all_moves['q'][pos]
+        return self.all_moves['q'][pos].copy()
 
 class FindLegalMove:
     def __init__(self, board, moves: StoreMoves, color: str):
@@ -141,7 +141,6 @@ class FindLegalMove:
         self.pieces = board.pieces
         self.king: Bitboard = board.pieces[f'{self.color}k']
         self.all: Bitboard = board.all
-        # self.all.omit_same(self.king)
         self.ally: Bitboard = board.white_pieces if self.color == 'w' else board.black_pieces
         self.foe: Bitboard = board.black_pieces if self.color == 'w' else board.white_pieces
 
@@ -169,6 +168,8 @@ class FindLegalMove:
                 piece_moves, captures = all_func[piece_name](self.pieces[f"{'w' if self.color == 'b' else 'b'}{piece_name}"])
                 for bitboard in piece_moves.values():
                     all_moves.combine(bitboard)
+            else:
+                king_bitboard = self.moves.get_king_bitboard(self.pieces[f'{'w' if self.color == 'b' else 'b'}k'])
 
         moves.omit_same(all_moves)
         captures = moves.find_same(self.foe)
@@ -279,9 +280,10 @@ class FindLegalMove:
 
             blocked = Bitboard(blocked)
             move.omit_same(blocked)
+            capture = Bitboard(capture)
 
             moves[biship_pos] = move
-            captures[biship_pos] = Bitboard(capture)
+            captures[biship_pos] = capture
                     
         return moves, captures
 

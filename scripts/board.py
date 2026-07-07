@@ -21,14 +21,14 @@ INIT_MAP = {
     'wn': [],
     'wb': [],
     'wq': [],
-    'wk': [27],
+    'wk': [61],
 
-    'bp': [29],
+    'bp': [],
     'br': [],
     'bn': [],
     'bb': [],
     'bq': [],
-    'bk': [1],
+    'bk': [45],
 }
 
 from bitboard import Bitboard, CORD_MAP_INT
@@ -130,13 +130,14 @@ class Board:
 
         all_func = self.legal_moves.get_all_moves()
         self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
-        # self.legal_moves.all.combine(self.pieces[f'{self.color}k'])
+        self.legal_moves.all.combine(self.pieces[f'{self.color}k'])
         for piece_name in all_func:
             if piece_name != 'k':
                 check_bitboard: Bitboard | tuple = all_func[piece_name](self.pieces[f'{foe_color}{piece_name}'], check_king=True)
                 if isinstance(check_bitboard, Bitboard):
                     check = True
                     save_squares.combine(check_bitboard)
+        self.legal_moves.all.omit_same(self.pieces[f'{self.color}k'])
 
         self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
         for piece_name in all_func:
@@ -144,6 +145,18 @@ class Board:
             for from_square, to_squares in captures.items():
                 if check and not piece_name == 'k':
                     to_squares = to_squares.find_same(save_squares)
+                if check and piece_name == 'k':
+                    remove_markers: Bitboard = to_squares.copy()
+                    self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
+                    self.legal_moves.foe.board |= to_squares.board
+                    for foe_piece in all_func:
+                        foe_moves, foe_captures = all_func[foe_piece](self.pieces[f'{foe_color}{foe_piece}'])
+                        for from_square_foe, to_squares_foe in foe_captures.items():
+                            to_squares.omit_same(to_squares_foe)
+                    self.legal_moves.foe.omit_same(remove_markers)
+                    self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
+                    
+
                 for to_square in to_squares.get_pos():
                     for piece in self.pieces:
                         if list(piece)[0] == foe_color and (self.pieces[piece].board & CORD_MAP_INT[to_square]):
@@ -154,7 +167,6 @@ class Board:
                     to_squares = to_squares.find_same(save_squares)
                 for to_square in to_squares.get_pos():
                     all_moves.append(Move(self, from_square, to_square, piece_name))
-        print(check)
 
         return all_moves
     
@@ -164,6 +176,5 @@ class Board:
         self.legal_moves = FindLegalMove(self, self.moves, self.color)
 
 board = Board(color='w')
-print(board)
 for bitboard in board.all_moves():
     print(bitboard)
