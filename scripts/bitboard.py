@@ -9,7 +9,7 @@ CORD_MAP_BIN = {
 
 
 class Bitboard:
-    def __init__(self, cords: list[int]):
+    def __init__(self, cords: list[int] = []):
         self.board = 0
 
         for cord in cords:
@@ -26,7 +26,7 @@ class Bitboard:
         return bool(self.board)
     
     def copy(self):
-        res = Bitboard([])
+        res = Bitboard()
         res.combine(self)
         return res
     
@@ -39,14 +39,13 @@ class Bitboard:
     def omit_same(self, bitboard: Bitboard):
         self.board &= ~ (bitboard.board & self.board)
 
-    def find_same(self, *args: Bitboard):
-        res = Bitboard([])
+    def find_same(self, *args: Bitboard)->Bitboard:
         res = self.copy()
         for arg in args:
             res.board &= arg.board
         return res
 
-    def combine(self, *args):
+    def combine(self, *args: Bitboard | None):
         for arg in args:
             if arg:
                 self.board |= arg.board

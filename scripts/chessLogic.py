@@ -1,5 +1,5 @@
+from __future__ import annotations
 from bitboard import Bitboard, CORD_MAP_INT
-from board import Board
 
 KNIGHT_ATTACKS = [
     -17, -15, 15, 17, -10, -6, 6, 10
@@ -56,7 +56,7 @@ class StoreMoves:
             self.all_moves['b'][pos] = Bitboard(b_attacks)
 
             # queen
-            q_attacks = Bitboard([])
+            q_attacks = Bitboard()
             q_attacks.combine(self.all_moves['b'][pos], self.all_moves['r'][pos])
             self.all_moves['q'][pos] = q_attacks
 
@@ -67,39 +67,54 @@ class StoreMoves:
                 attack_col = k_attack % 8
                 if 1 <= k_attack <= 64 and not ((col == 1 and attack_col == 0) or (col == 8 and attack_col == 1)):
                     k_attacks.append(k_attack)
-            self.all_moves['k'][pos] = Bitboard(k_attacks)
+
+            wcastle = {'long': Bitboard([i for i in range(57, 62)]), 'short': Bitboard([i for i in range(61, 65)])}
+            bcastle = {'long': Bitboard([i for i in range(1, 6)]), 'short': Bitboard([i for i in range(5, 9)])}
+            self.all_moves['k'][pos] = {'move': Bitboard(k_attacks), 'castle': {'b': bcastle, 'w': wcastle}}
 
             # pawn white
             wpawn_moves = []
             wpawn_attacks = []
+            en_passant = []
             if 9 <= pos <= 56:
-
+                # attack
                 if pos not in {9, 17, 25, 33, 41, 49}:
                     wpawn_attacks.append(pos - 9)
+                    # en passant
+                    if pos in {i for i in range(25, 33)}:
+                        en_passant.append(pos - 1)
                 if pos not in {16, 24, 32, 40, 48, 56}:
                     wpawn_attacks.append(pos - 7)
-                
+                    if pos in {i for i in range(25, 33)}:
+                        en_passant.append(pos + 1)
+                # move
                 wpawn_moves.append(pos - 8)
                 if 49 <= pos <= 56:
                     wpawn_moves.append(pos - 16)
-                self.all_moves['p']['w'][pos] = {'move': Bitboard(wpawn_moves), 'attack': Bitboard(wpawn_attacks)}
+
+                self.all_moves['p']['w'][pos] = {'move': Bitboard(wpawn_moves), 'attack': Bitboard(wpawn_attacks), 'en_passant': Bitboard(en_passant)}
 
             # pawn black
             bpawn_moves = []
             bpawn_attacks = []
+            en_passant = []
             if 9 <= pos <= 56:
 
                 if pos not in {9, 17, 25, 33, 41, 49}:
                     bpawn_attacks.append(pos + 7)
+                    if pos in {i for i in range(33, 41)}:
+                        en_passant.append(pos - 1)
                 if pos not in {16, 24, 32, 40, 48, 56}:
+                    if pos in {i for i in range(33, 41)}:
+                        en_passant.append(pos + 1)
                     bpawn_attacks.append(pos + 9)
 
                 bpawn_moves.append(pos + 8)
                 if 9 <= pos <= 16:
                     bpawn_moves.append(pos + 16)       
-                self.all_moves['p']['b'][pos] = {"move": Bitboard(bpawn_moves), "attack": Bitboard(bpawn_attacks)}
+                self.all_moves['p']['b'][pos] = {"move": Bitboard(bpawn_moves), "attack": Bitboard(bpawn_attacks), 'en_passant': Bitboard(en_passant)}
     
-    def get_king_bitboard(self, pos: int)->Bitboard:
+    def get_king_bitboard(self, pos: int)->dict[str, Bitboard]:
         return self.all_moves['k'][pos]
     
     def get_knight_bitboard(self, pos: int)->Bitboard:
@@ -119,164 +134,241 @@ class StoreMoves:
         return self.all_moves['q'][pos]
 
 class FindLegalMove:
-    def __init__(self, board: Board, moves: StoreMoves, color: str):
+    def __init__(self, board, moves: StoreMoves, color: str):
         self.moves = moves
         self.color = color
-        self.board = board
+        
+        self.pieces = board.pieces
+        self.king: Bitboard = board.pieces[f'{self.color}k']
+        self.all: Bitboard = board.all
+        # self.all.omit_same(self.king)
+        self.ally: Bitboard = board.white_pieces if self.color == 'w' else board.black_pieces
+        self.foe: Bitboard = board.black_pieces if self.color == 'w' else board.white_pieces
 
-        self.ally = self.board.white_pieces if self.color == 'w' else self.board.black_pieces
-        self.foe = self.board.black_pieces if self.color == 'w' else self.board.white_pieces
-
-    def update(self, board, color):
-        self.color = color
-
-        # a new FindLegalMove class should be created every move to update self.board
-        # otherwise update() function is used for calculations
-        self.ally = board.white_pieces if self.color == 'w' else self.board.black_pieces
-        self.foe = board.black_pieces if self.color == 'w' else self.board.white_pieces
-
-    def knight_move(self, knights: Bitboard):
+    def knight_move(self, knights: Bitboard, check_king: bool=False)->tuple[dict[int, Bitboard], dict[int, Bitboard]] | Bitboard:
         positions = knights.get_pos()
-        attacks = {}
+        moves = {}
+        captures = {}
         for pos in positions:
-            attack = self.moves.get_knight_bitboard(pos)
-            attack.omit_same(self.ally)
-            attacks[pos] = attack
-        return attacks
-    
-    def king_move(self, king: Bitboard):
-        position = king.get_pos()[0]
-        attack = self.moves.get_king_bitboard(position)
-        attack.omit_same(self.ally)
-        return {position: attack}
+            move = self.moves.get_knight_bitboard(pos)
+            if check_king and self.king.board & move.board:
+                return Bitboard([pos])
+            captures[pos] = move.find_same(self.foe)
+            move.omit_same(self.all)
+            moves[pos] = move
 
-    def pawn_move(self, pawns: Bitboard):
+        return moves, captures 
+    
+    def king_move(self, king: Bitboard)->tuple[dict[int, Bitboard], dict[int, Bitboard]]:
+        pos = king.get_pos()[0]
+        moves = self.moves.get_king_bitboard(pos)['move']
+        all_func = self.get_all_moves()
+        all_moves = Bitboard()
+        for piece_name in all_func:
+            if piece_name != 'k':
+                piece_moves, captures = all_func[piece_name](self.pieces[f"{'w' if self.color == 'b' else 'b'}{piece_name}"])
+                for bitboard in piece_moves.values():
+                    all_moves.combine(bitboard)
+
+        moves.omit_same(all_moves)
+        captures = moves.find_same(self.foe)
+        moves.omit_same(self.all)
+        return {pos: moves}, {pos: captures}
+
+    def pawn_move(self, pawns: Bitboard, check_king: bool=False)->tuple[dict[int, Bitboard], dict[int, Bitboard]] | Bitboard:
         positions = pawns.get_pos()
         moves = {}
+        captures = {}
         for pos in positions:
 
-            # move
+            ## move
             move = self.moves.get_pawn_bitboard(pos, self.color)['move']
-            overlap_with_ally = move.find_same(self.ally)
-            overlap_with_foe = move.find_same(self.foe)
-            if overlap_with_ally:  
-                if self.color == 'w' and 49 <= pos <= 56 and overlap_with_ally.get_pos()[0] == pos - 8:
+            overlap = move.find_same(self.all)
+            if overlap:  
+                if self.color == 'w' and 49 <= pos <= 56 and overlap.get_pos()[0] == pos - 8:
                         move.board = 0
-                elif self.color == 'b' and 9 <= pos <= 16 and overlap_with_ally.get_pos()[0] == pos + 8:
-                        move.board = 0
-                else:
-                    move.omit_same(self.ally)
-            if overlap_with_foe:  
-                if self.color == 'w' and 49 <= pos <= 56 and overlap_with_foe.get_pos()[0] == pos - 8:
-                        move.board = 0
-                elif self.color == 'b' and 9 <= pos <= 16 and overlap_with_foe.get_pos()[0] == pos + 8:
+                elif self.color == 'b' and 9 <= pos <= 16 and overlap.get_pos()[0] == pos + 8:
                         move.board = 0
                 else:
-                    move.omit_same(self.foe)
+                    move.omit_same(self.all)
 
-            # attack
-            attack = self.moves.get_pawn_bitboard(pos, self.color)['attack']
-            attack_foe = attack.find_same(self.foe)
-            move.board |= attack_foe.board
-            
+            ## captures
+            capture = self.moves.get_pawn_bitboard(pos, self.color)['attack']
+            if check_king and capture.board & self.king.board:
+                return Bitboard([pos])
+            capture = capture.find_same(self.foe)
+
+            captures[pos] = capture
             moves[pos] = move
-        return moves
+        return moves, captures
 
     # sliding pieces
-    def rook_move(self, rooks:Bitboard)->dict:
+    def rook_move(self, rooks:Bitboard, check_king: bool=False)->tuple[dict[int, Bitboard], dict[int, Bitboard]] | Bitboard:
         positions = rooks.get_pos()
-        attacks = {}
+        captures = {}
+        moves = {}
         for rook_pos in positions:
             row = (rook_pos - 1) // 8 + 1 # starts from 1
             col = rook_pos % 8 if rook_pos % 8 != 0 else 8
 
-            attack = self.moves.get_rook_bitboard(rook_pos)
-            overlapped_ally = set(attack.find_same(self.ally).get_pos())
-            overlapped_foe = set(attack.find_same(self.foe).get_pos())
+            move = self.moves.get_rook_bitboard(rook_pos)
+            overlapped = set(move.find_same(self.all).get_pos())
+            overlapped_foe = set(move.find_same(self.foe).get_pos())
             blocked = []
+            capture = []
             direction_args = [
-                (rook_pos, 8 * row + 1), (rook_pos - 1, 8 * (row - 1), -1), (rook_pos - 8, col - 1, -8), (rook_pos + 8, 57 + col, 8)
+                (rook_pos + 1, 8 * row + 1), (rook_pos - 1, 8 * (row - 1), -1), (rook_pos - 8, col - 1, -8), (rook_pos + 8, 57 + col, 8)
             ]
             for direction in direction_args:
                 first_overlap = 0
+                if check_king:
+                    connecting_line = [rook_pos]
                 for square in range(*direction):
-                    if (square in overlapped_ally or square in overlapped_foe) and not first_overlap:
+                    if square in overlapped and not first_overlap:
                         first_overlap = square
+                        if check_king and CORD_MAP_INT[first_overlap] & self.king.board:
+                            return Bitboard(connecting_line)
+                    if check_king:
+                        connecting_line.append(square)
                     if first_overlap:
                         blocked.append(square)
                 if first_overlap in overlapped_foe:
-                    blocked.remove(first_overlap)
+                    capture.append(first_overlap)
             blocked = Bitboard(blocked)
 
-            attack.omit_same(blocked)
+            move.omit_same(blocked)
 
-            attacks[rook_pos] = attack 
+            moves[rook_pos] = move 
+            captures[rook_pos] = Bitboard(capture)
 
-        return attacks
+        return moves, captures
 
-    def biship_move(self, biships: Bitboard)->dict:
+    def biship_move(self, biships: Bitboard, check_king: bool=False)->tuple[dict[int, Bitboard], dict[int, Bitboard]] | Bitboard:
         positions = biships.get_pos()
-        attacks = {}
+        moves = {}
+        captures = {}
         for biship_pos in positions:
 
-            attack = self.moves.get_biship_bitboard(biship_pos)
-            overlapped_ally = set(attack.find_same(self.ally).get_pos())
-            overlapped_foe = set(attack.find_same(self.foe).get_pos())
+            move = self.moves.get_biship_bitboard(biship_pos)
+            overlapped = set(move.find_same(self.all).get_pos())
+            overlapped_foe = set(move.find_same(self.foe).get_pos())
             blocked = []
+            capture = []
             direction_args = [
-                (biship_pos, 0, -7), (biship_pos, 65, 9), (biship_pos, 0, -9), (biship_pos, 65, 7)
+                (biship_pos - 7, 0, -7), (biship_pos + 9, 65, 9), (biship_pos - 9, 0, -9), (biship_pos + 7, 65, 7)
             ]
 
             for direction in direction_args:
                 first_overlap = 0
+                if check_king:
+                    connecting_line = [biship_pos]
                 for square in range(*direction):
-                    if (square in overlapped_ally or square in overlapped_foe) and not first_overlap:
+                    if square in overlapped and not first_overlap:
                         first_overlap = square
+                        if check_king and CORD_MAP_INT[first_overlap] & self.king.board:
+                            return Bitboard(connecting_line)
+                    if check_king:
+                        connecting_line.append(square)
                     if first_overlap:
                         blocked.append(square)
                     if square % 8 == 0 or square % 8 == 1:
                         break
                     
                 if first_overlap in overlapped_foe:
-                    blocked.remove(first_overlap)
+                    capture.append(first_overlap)
+
             blocked = Bitboard(blocked)
+            move.omit_same(blocked)
 
-            attack.omit_same(blocked)
-
-            attacks[biship_pos] = attack
+            moves[biship_pos] = move
+            captures[biship_pos] = Bitboard(capture)
                     
-        return attacks
+        return moves, captures
 
-    def queen_move(self, queens:Bitboard):
+    def queen_move(self, queens:Bitboard, check_king: bool=False)->tuple[dict[int, Bitboard], dict[int, Bitboard]] | Bitboard:
         positions = queens.get_pos()
-        attacks = {}
+        moves = {}
+        captures = {}
         for queen_pos in positions:
             row = (queen_pos - 1) // 8 + 1 # starts from 1
             col = queen_pos % 8 if queen_pos % 8 != 0 else 8
 
-            attack = self.moves.get_queen_bitboard(queen_pos)
-            overlapped_ally = set(attack.find_same(self.ally).get_pos())
-            overlapped_foe = set(attack.find_same(self.foe).get_pos())
+            move = self.moves.get_queen_bitboard(queen_pos)
+            overlapped = set(move.find_same(self.all).get_pos())
+            overlapped_foe = set(move.find_same(self.foe).get_pos())
             blocked = []
-            direction_args = [
-                (queen_pos, 8 * row + 1), (queen_pos - 1, 8 * (row - 1), -1), (queen_pos - 8, col - 1, -8), (queen_pos + 8, 57 + col, 8), (queen_pos, 0, -7), (queen_pos, 65, 9), (queen_pos, 0, -9), (queen_pos, 65, 7), 
+            capture = []
+            rook_direction_args = [
+                (queen_pos + 1, 8 * row + 1), (queen_pos - 1, 8 * (row - 1), -1), (queen_pos - 8, col - 1, -8), (queen_pos + 8, 57 + col, 8),  
             ]
-            for direction in direction_args:
+            biship_direction_args = [
+                (queen_pos - 7, 0, -7), (queen_pos + 9, 65, 9), (queen_pos - 9, 0, -9), (queen_pos + 7, 65, 7),
+            ]
+            for direction in rook_direction_args:
                 first_overlap = 0
+                if check_king:
+                    connecting_line = [queen_pos]
                 for square in range(*direction):
-                    if (square in overlapped_ally or square in overlapped_foe) and not first_overlap:
+                    if square in overlapped and not first_overlap:
                         first_overlap = square
+                        if check_king and CORD_MAP_INT[first_overlap] & self.king.board:
+                            return Bitboard(connecting_line)
+                    if check_king:
+                        connecting_line.append(square)
+                    if first_overlap:
+                        blocked.append(square)
+                if first_overlap in overlapped_foe:
+                    capture.append(first_overlap)
+            for direction in biship_direction_args:
+                first_overlap = 0
+                if check_king:
+                    connecting_line = [queen_pos]
+                for square in range(*direction):
+                    if square in overlapped and not first_overlap:
+                        first_overlap = square
+                        if check_king and CORD_MAP_INT[first_overlap] & self.king.board:
+                            return Bitboard(connecting_line)
+                    if check_king:
+                        connecting_line.append(square)
                     if first_overlap:
                         blocked.append(square)
                     if square % 8 == 0 or square % 8 == 1:
                         break
                 if first_overlap in overlapped_foe:
-                    blocked.remove(first_overlap)
+                    capture.append(first_overlap)
 
             blocked = Bitboard(blocked)
 
-            attack.omit_same(blocked)
+            move.omit_same(blocked)
 
-            attacks[queen_pos] = attack 
+            moves[queen_pos] = move 
 
-        return attacks
+            captures[queen_pos] = Bitboard(capture)
+
+        return moves, captures
+    
+    def get_all_moves(self):
+        all_moves = {
+            'k': self.king_move,
+            'q': self.queen_move,
+            'r': self.rook_move,
+            'b': self.biship_move,
+            'n': self.knight_move,
+            'p': self.pawn_move,
+        }
+        return all_moves
+    
+
+# board = Board()
+# moves = StoreMoves()
+# legal_moves = FindLegalMove(board, moves, color='w')
+
+# rook_moves = legal_moves.rook_move(board.pieces['wr'])
+# moves, captures = rook_moves if isinstance(rook_moves, tuple) else ({}, {})
+# for from_square, to_squares in moves.items():
+#     print(to_squares)
+#     print('\n')
+
+# for from_square, to_squares in captures.items():
+#     print(to_squares)
+#     print('\n')

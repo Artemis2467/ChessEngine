@@ -32,5 +32,5 @@ class DisplayedBoard:
             for cord in cords:
                 surf.blit(piece_surf, self.board_tile[cord]['display_cord'])    
 
-    def display_moves(self, surf):
+    def display_legal_moves(self, surf):
         pass
