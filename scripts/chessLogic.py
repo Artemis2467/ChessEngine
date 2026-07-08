@@ -361,17 +361,17 @@ class FindLegalMove:
         }
         return all_moves
     
-
+# from board import Board
 # board = Board()
-# moves = StoreMoves()
-# legal_moves = FindLegalMove(board, moves, color='w')
+# stored_moves = StoreMoves()
+# legal_moves = FindLegalMove(board, stored_moves, color='b')
 
-# rook_moves = legal_moves.rook_move(board.pieces['wr'])
-# moves, captures = rook_moves if isinstance(rook_moves, tuple) else ({}, {})
-# for from_square, to_squares in moves.items():
-#     print(to_squares)
-#     print('\n')
+# print(legal_moves.all)
+# print('\n')
+# print(legal_moves.foe)
+# print('\n')
+# print(legal_moves.ally)
 
-# for from_square, to_squares in captures.items():
-#     print(to_squares)
-#     print('\n')
+# # moves, captures = legal_moves.king_move(board.pieces['bk'])
+# # for from_square, to_squares in moves.items():
+# #     print(to_squares)

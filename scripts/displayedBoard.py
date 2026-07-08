@@ -1,11 +1,12 @@
 COLOR_BLACK = '#B58863'
 COLOR_WHITE = '#F0D9B5'
 
-from scripts.utils import load_images
+from utils import load_images
+from board import Board
 import pygame
 
 class DisplayedBoard:
-    def __init__(self, game, board, tile_size = 90):
+    def __init__(self, game, board: Board, tile_size = 90):
         self.game = game
 
         self.board_tile = {
@@ -15,6 +16,8 @@ class DisplayedBoard:
         self.board = board
 
         self.piece_images = load_images('bases', tile_size)
+
+        self.moves = self.board.all_moves()
 
     def display_board(self, surf):
         for col in range(8):
