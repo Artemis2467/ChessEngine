@@ -138,7 +138,7 @@ class FindLegalMove:
         self.moves = moves
         self.color = color
         
-        self.pieces = board.pieces
+        self.pieces:dict[str, Bitboard] = board.pieces
         self.king: Bitboard = board.pieces[f'{self.color}k']
         self.all: Bitboard = board.all
         self.ally: Bitboard = board.white_pieces if self.color == 'w' else board.black_pieces
@@ -169,7 +169,8 @@ class FindLegalMove:
                 for bitboard in piece_moves.values():
                     all_moves.combine(bitboard)
             else:
-                king_bitboard = self.moves.get_king_bitboard(self.pieces[f'{'w' if self.color == 'b' else 'b'}k'])
+                king_bitboard = self.moves.get_king_bitboard(self.pieces[f'{'w' if self.color == 'b' else 'b'}k'].get_pos()[0])['move']
+                moves.omit_same(king_bitboard)
 
         moves.omit_same(all_moves)
         captures = moves.find_same(self.foe)

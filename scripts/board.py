@@ -21,14 +21,14 @@ INIT_MAP = {
     'wn': [],
     'wb': [],
     'wq': [],
-    'wk': [61],
+    'wk': [],
 
     'bp': [],
     'br': [],
     'bn': [],
     'bb': [],
     'bq': [],
-    'bk': [45],
+    'bk': [],
 }
 
 from bitboard import Bitboard, CORD_MAP_INT
