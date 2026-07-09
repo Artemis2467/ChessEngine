@@ -7,9 +7,13 @@ with open('exception_examiner.json', 'r') as f:
 init_map = board_holder['board']
 board = Board(color=board_holder['color'], init_map=init_map)
 moves = board.all_moves()
+board.move(moves[10])
+moves = board.all_moves()
+board.move(moves[0])
+print(board)
+moves = board.all_moves()
 for move in moves:
     print(move)
-
-game = Chess(board_holder['color'], init_map)
-game.run(examin_exception=False, show_only=True)
+# game = Chess(board_holder['color'], init_map)
+# game.run(examin_exception=False, show_only=True)
 

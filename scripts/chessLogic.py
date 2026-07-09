@@ -68,8 +68,8 @@ class StoreMoves:
                 if 1 <= k_attack <= 64 and not ((col == 1 and attack_col == 0) or (col == 8 and attack_col == 1)):
                     k_attacks.append(k_attack)
 
-            wcastle = {'long': Bitboard([i for i in range(57, 62)]), 'short': Bitboard([i for i in range(61, 65)])}
-            bcastle = {'long': Bitboard([i for i in range(1, 6)]), 'short': Bitboard([i for i in range(5, 9)])}
+            wcastle = {'long': Bitboard([i for i in range(59, 61)]), 'short': Bitboard([i for i in range(62, 64)])}
+            bcastle = {'long': Bitboard([i for i in range(3, 5)]), 'short': Bitboard([i for i in range(6, 8)])}
             self.all_moves['k'][pos] = {'move': Bitboard(k_attacks), 'castle': {'b': bcastle, 'w': wcastle}}
 
             # pawn white
@@ -114,7 +114,7 @@ class StoreMoves:
                     bpawn_moves.append(pos + 16)       
                 self.all_moves['p']['b'][pos] = {"move": Bitboard(bpawn_moves), "attack": Bitboard(bpawn_attacks), 'en_passant': Bitboard(en_passant)}
     
-    def get_king_bitboard(self, pos: int)->dict[str, Bitboard]:
+    def get_king_bitboard(self, pos: int)->dict:
         return self.all_moves['k'][pos].copy()
     
     def get_knight_bitboard(self, pos: int)->Bitboard:

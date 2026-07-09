@@ -24,6 +24,9 @@ class Move:
         
         self.color = board.color
         self.board = board
+        self.cur_color_piece = self.board.white_pieces if self.color == 'w' else self.board.black_pieces
+        self.other_color_piece = self.board.black_pieces if self.color == 'w' else self.board.white_pieces
+        
         self.orig = orig
         self.to = to
         self.piece = piece
@@ -39,13 +42,10 @@ class Move:
             self.board.pieces[self.captured_piece].clear_cord(self.to)
         self.board.pieces[f'{self.color}{self.piece}'].set_cord(self.to)
 
-        cur_color_piece = self.board.white_pieces if self.color == 'w' else self.board.black_pieces
-        other_color_piece = self.board.black_pieces if self.color == 'w' else self.board.white_pieces
-
-        cur_color_piece.clear_cord(self.orig)
+        self.cur_color_piece.clear_cord(self.orig)
         if self.captured_piece:
-            other_color_piece.clear_cord(self.to)
-        cur_color_piece.set_cord(self.to)
+            self.other_color_piece.clear_cord(self.to)
+        self.cur_color_piece.set_cord(self.to)
 
         self.board.all.clear_cord(self.orig)
         self.board.all.set_cord(self.to)
@@ -56,13 +56,10 @@ class Move:
             self.board.pieces[f'{'b' if self.color == 'w' else 'w'}{self.captured_piece}'].set_cord(self.to)
         self.board.pieces[f'{self.color}{self.piece}'].clear_cord(self.to)
 
-        cur_color_piece = self.board.white_pieces if self.color == 'w' else self.board.black_pieces
-        other_color_piece = self.board.black_pieces if self.color == 'w' else self.board.white_pieces
-
-        cur_color_piece.set_cord(self.orig)
+        self.cur_color_piece.set_cord(self.orig)
         if self.captured_piece:
-            other_color_piece.set_cord(self.to)
-        cur_color_piece.clear_cord(self.to)
+            self.other_color_piece.set_cord(self.to)
+        self.cur_color_piece.clear_cord(self.to)
 
         self.board.all.set_cord(self.orig)
         if not self.captured_piece:
@@ -70,6 +67,42 @@ class Move:
 
     def display(self):
         pass
+
+class Castle(Move):
+    def __init__(self, board: Board, is_short_castle: bool):
+        if board.color == 'w' and is_short_castle:
+            king_orig, king_to = 61, 63
+            rook_orig, rook_to = 64, 62
+        elif board.color == 'w' and not is_short_castle:
+            king_orig, king_to = 61, 59
+            rook_orig, rook_to = 57, 60
+        elif board.color == 'b' and is_short_castle:
+            king_orig, king_to = 5, 7
+            rook_orig, rook_to = 8, 6
+        elif board.color == 'b' and not is_short_castle:
+            king_orig, king_to = 5, 3
+            rook_orig, rook_to = 1, 4
+        
+        super().__init__(board, orig=king_orig, to=king_to, piece='k')
+        self.rook_orig, self.rook_to = rook_orig, rook_to
+        self.is_short_castle = is_short_castle
+
+    def execute(self):
+        super().execute()
+
+        self.board.pieces[f'{self.color}r'].clear_cord(self.rook_orig)
+        self.board.pieces[f'{self.color}r'].set_cord(self.rook_to)
+        
+        self.cur_color_piece.clear_cord(self.rook_orig)
+        self.cur_color_piece.set_cord(self.rook_to)
+
+        self.board.all.clear_cord(self.rook_orig)
+        self.board.all.set_cord(self.rook_to)
+
+    def __str__(self):
+        return f'{'short' if self.is_short_castle else 'long'} castle: \n{Bitboard([self.orig, self.to])}'
+
+
 
 class Board:
     def __init__(self, color:str='w', init_map=INIT_MAP):
@@ -107,6 +140,8 @@ class Board:
 
         self.legal_moves = FindLegalMove(self, self.moves, self.color)
 
+        self.castle_possible = {'b': {'long': True, 'short': True}, 'w': {'long': True, 'short': True}}
+
     def __str__(self):
         return str(self.all)
     
@@ -114,13 +149,14 @@ class Board:
     def is_in_check(self, foe_color, find_save_squares: Literal[False]=False)->bool: ...
 
     @overload
-    def is_in_check(self, foe_color, find_save_squares: Literal[True])->tuple[int, bool, Bitboard]: ...
+    def is_in_check(self, foe_color, find_save_squares: Literal[True])->tuple[int, bool, Bitboard, Bitboard]: ...
     
-    def is_in_check(self, foe_color, find_save_squares=False)->Union[bool, tuple[int, bool, Bitboard]]:
+    def is_in_check(self, foe_color, find_save_squares=False)->Union[bool, tuple[int, bool, Bitboard, Bitboard]]:
         check = False
         check_count = 0
         if find_save_squares:
             save_squares = Bitboard()
+            foe_moves = Bitboard()
         all_func = self.legal_moves.get_all_moves()
     
         self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
@@ -132,6 +168,10 @@ class Board:
                     if find_save_squares:
                         check_count = 1
                         save_squares.combine(check_bitboard)
+                elif find_save_squares and isinstance(check_bitboard, tuple):
+                    moves, captures = check_bitboard
+                    for from_square, to_squares in moves.items():
+                        foe_moves.combine(to_squares)
                 elif isinstance(check_bitboard, Bitboard) and check:
                     check_count += 1
                     save_squares.combine(check_bitboard)
@@ -143,17 +183,18 @@ class Board:
 
         if not check and not find_save_squares:
             return False
-        return check_count, check, save_squares
+        return check_count, check, save_squares, foe_moves
 
 
     def all_moves(self)->list[Move]:
         foe_color = 'w' if self.color == 'b' else 'b'
-        all_moves = []
+        all_moves: list[Move] = []
 
         all_func = self.legal_moves.get_all_moves()
     
         # check if king is in check
-        check_count, check, save_squares = self.is_in_check(foe_color, find_save_squares=True)
+        check_count, check, save_squares, foe_moves = self.is_in_check(foe_color, find_save_squares=True)
+        
         # find moves
         for piece_name in all_func:
             if piece_name == 'k':
@@ -214,10 +255,40 @@ class Board:
                         self.legal_moves.pieces[f'{self.color}k'].clear_cord(to_square)
             if piece_name == 'k':
                 self.legal_moves.all.combine(self.pieces[f'{self.color}k'])
+
+        # castle
+        king_pos = self.pieces[f"{self.color}k"].get_pos()[0]
+        castle_squares = self.moves.get_king_bitboard(king_pos)['castle'][self.color]['short']
+        castle_condition = not check and not castle_squares.find_same(foe_moves) and not castle_squares.find_same(self.all)
+        if castle_condition and self.castle_possible[self.color]['short']:
+            all_moves.append(Castle(self, is_short_castle=True))
+        castle_squares = self.moves.get_king_bitboard(king_pos)['castle'][self.color]['long']
+        if castle_condition and self.castle_possible[self.color]['long']:
+            all_moves.append(Castle(self, is_short_castle=False))
+        
         return all_moves
     
     def move(self, move: Move):
         move.execute()
+        if move.piece == 'r':
+            match move.orig:
+                case 1:
+                    self.castle_possible['b']['long'] = False
+                case 8:
+                    self.castle_possible['b']['short'] = False
+                case 57:
+                    self.castle_possible['w']['long'] = False
+                case 64:
+                    self.castle_possible['w']['short'] = False
+        if move.piece == 'k':
+            match move.orig:
+                case 61:
+                    self.castle_possible['w']['long'] = False
+                    self.castle_possible['w']['short'] = False
+                case 5:
+                    self.castle_possible['b']['long'] = False
+                    self.castle_possible['b']['short'] = False
+
         self.color = 'w' if self.color == 'b' else 'b'
         self.legal_moves = FindLegalMove(self, self.moves, self.color)
 
