@@ -170,21 +170,6 @@ class Board:
                         to_squares = to_squares.find_same(save_squares)
                     else:
                         to_squares.empty()
-
-                # # check if king can capture checking piece (check protection)
-                # if check and piece_name == 'k':
-                    
-                #     markers: Bitboard = to_squares.copy()
-                #     self.legal_moves.color = foe_color
-                #     self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
-                #     self.legal_moves.foe.board |= to_squares.board
-                #     for foe_piece in all_func:
-                #         foe_moves, foe_captures = all_func[foe_piece](self.pieces[f'{foe_color}{foe_piece}'])
-                #         for from_square_foe, to_squares_foe in foe_captures.items():
-                #             to_squares.omit_same(to_squares_foe)
-                #     self.legal_moves.foe.omit_same(markers)
-                #     self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
-                #     self.legal_moves.color = self.color
                 
                 # add capture moves
                 for to_square in to_squares.get_pos():
@@ -240,8 +225,3 @@ class Board:
 # moves = board.all_moves()
 # for bitboard in moves:
 #     print(bitboard)
-
-"""
-1. Cannot handle discover checkes done :)
-2. cannot handle king skews
-"""
