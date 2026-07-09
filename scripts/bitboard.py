@@ -59,6 +59,8 @@ class Bitboard:
             positions.append(CORD_MAP_BIN[pos])
         return positions
     
+    def empty(self):
+        self.board = 0
 
 
 

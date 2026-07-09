@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import overload, Union, Literal
 
 INIT_MAP = {
     'wp': [i for i in range(49, 57)],
@@ -14,22 +15,6 @@ INIT_MAP = {
     'bq': [4],
     'bk': [5],
 }
-
-# INIT_MAP = {
-#     'wp': [],
-#     'wr': [],
-#     'wn': [],
-#     'wb': [],
-#     'wq': [28],
-#     'wk': [21],
-
-#     'bp': [],
-#     'br': [],
-#     'bn': [],
-#     'bb': [],
-#     'bq': [43],
-#     'bk': [27],
-# }
 
 from bitboard import Bitboard, CORD_MAP_INT
 from chessLogic import StoreMoves, FindLegalMove
@@ -87,24 +72,26 @@ class Move:
         pass
 
 class Board:
-    def __init__(self, color:str='w'):
+    def __init__(self, color:str='w', init_map=INIT_MAP):
+
+        self.init_map = init_map
         
         self.color = color
 
         # init 12 pieces
         self.pieces = {
-            'wp': Bitboard(INIT_MAP['wp']),
-            'wr': Bitboard(INIT_MAP['wr']),
-            'wb': Bitboard(INIT_MAP['wb']),
-            'wn': Bitboard(INIT_MAP['wn']),
-            'wq': Bitboard(INIT_MAP['wq']),
-            'wk': Bitboard(INIT_MAP['wk']),
-            'bp': Bitboard(INIT_MAP['bp']),
-            'br': Bitboard(INIT_MAP['br']),
-            'bb': Bitboard(INIT_MAP['bb']),
-            'bn': Bitboard(INIT_MAP['bn']),
-            'bq': Bitboard(INIT_MAP['bq']),
-            'bk': Bitboard(INIT_MAP['bk']),
+            'wp': Bitboard(self.init_map['wp']),
+            'wr': Bitboard(self.init_map['wr']),
+            'wb': Bitboard(self.init_map['wb']),
+            'wn': Bitboard(self.init_map['wn']),
+            'wq': Bitboard(self.init_map['wq']),
+            'wk': Bitboard(self.init_map['wk']),
+            'bp': Bitboard(self.init_map['bp']),
+            'br': Bitboard(self.init_map['br']),
+            'bb': Bitboard(self.init_map['bb']),
+            'bn': Bitboard(self.init_map['bn']),
+            'bq': Bitboard(self.init_map['bq']),
+            'bk': Bitboard(self.init_map['bk']),
         }
 
         self.white_pieces = Bitboard()
@@ -122,29 +109,55 @@ class Board:
 
     def __str__(self):
         return str(self.all)
+    
+    @overload
+    def is_in_check(self, foe_color, find_save_squares: Literal[False]=False)->bool: ...
 
-    def all_moves(self)->list[Move]:
-        foe_color = 'w' if self.color == 'b' else 'b'
+    @overload
+    def is_in_check(self, foe_color, find_save_squares: Literal[True])->tuple[int, bool, Bitboard]: ...
+    
+    def is_in_check(self, foe_color, find_save_squares=False)->Union[bool, tuple[int, bool, Bitboard]]:
         check = False
-        all_moves = []
-        save_squares = Bitboard()
-
+        check_count = 0
+        if find_save_squares:
+            save_squares = Bitboard()
         all_func = self.legal_moves.get_all_moves()
     
-        # check if king is in check
         self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
         for piece_name in all_func:
             if piece_name != 'k':
                 check_bitboard: Bitboard | tuple = all_func[piece_name](self.pieces[f'{foe_color}{piece_name}'], check_king=True)
-                if isinstance(check_bitboard, Bitboard):
+                if not check and isinstance(check_bitboard, Bitboard):
                     check = True
+                    if find_save_squares:
+                        check_count = 1
+                        save_squares.combine(check_bitboard)
+                elif isinstance(check_bitboard, Bitboard) and check:
+                    check_count += 1
                     save_squares.combine(check_bitboard)
+                if check and not find_save_squares:
+                    self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
+                    return True
+
         self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
 
+        if not check and not find_save_squares:
+            return False
+        return check_count, check, save_squares
+
+
+    def all_moves(self)->list[Move]:
+        foe_color = 'w' if self.color == 'b' else 'b'
+        all_moves = []
+
+        all_func = self.legal_moves.get_all_moves()
+    
+        # check if king is in check
+        check_count, check, save_squares = self.is_in_check(foe_color, find_save_squares=True)
         # find moves
         for piece_name in all_func:
             if piece_name == 'k':
-                self.legal_moves.all.omit_same(self.pieces[f'{self.color}k'])
+                self.legal_moves.all.omit_same(self.pieces[f'{self.color}k']) # avoid king being in the path of attacking piece
             moves, captures = all_func[piece_name](self.pieces[f'{self.color}{piece_name}'])
 
             # find capture moves
@@ -153,36 +166,67 @@ class Board:
                 # find checking piece capture
                 if check and not piece_name == 'k':
                     to_squares = to_squares.find_same(save_squares)
+                    if check_count < 2:
+                        to_squares = to_squares.find_same(save_squares)
+                    else:
+                        to_squares.empty()
 
-                # check if king can capture checking piece (protected)
-                if check and piece_name == 'k':
+                # # check if king can capture checking piece (check protection)
+                # if check and piece_name == 'k':
                     
-                    markers: Bitboard = to_squares.copy()
-                    self.legal_moves.color = foe_color
-                    self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
-                    self.legal_moves.foe.board |= to_squares.board
-                    for foe_piece in all_func:
-                        foe_moves, foe_captures = all_func[foe_piece](self.pieces[f'{foe_color}{foe_piece}'])
-                        for from_square_foe, to_squares_foe in foe_captures.items():
-                            to_squares.omit_same(to_squares_foe)
-                    self.legal_moves.foe.omit_same(markers)
-                    self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
-                    self.legal_moves.color = self.color
+                #     markers: Bitboard = to_squares.copy()
+                #     self.legal_moves.color = foe_color
+                #     self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
+                #     self.legal_moves.foe.board |= to_squares.board
+                #     for foe_piece in all_func:
+                #         foe_moves, foe_captures = all_func[foe_piece](self.pieces[f'{foe_color}{foe_piece}'])
+                #         for from_square_foe, to_squares_foe in foe_captures.items():
+                #             to_squares.omit_same(to_squares_foe)
+                #     self.legal_moves.foe.omit_same(markers)
+                #     self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
+                #     self.legal_moves.color = self.color
                 
                 # add capture moves
                 for to_square in to_squares.get_pos():
                     for piece in self.pieces:
                         if list(piece)[0] == foe_color and (self.pieces[piece].board & CORD_MAP_INT[to_square]):
-                            all_moves.append(Move(self, from_square, to_square, piece_name, captured_piece=piece))
+                            self.legal_moves.all.clear_cord(from_square)
+                            self.legal_moves.pieces[piece].clear_cord(to_square)
+                            self.legal_moves.ally.set_cord(to_square)
+                            if piece_name == 'k':
+                                self.legal_moves.pieces[f'{self.color}k'].clear_cord(from_square)
+                                self.legal_moves.pieces[f'{self.color}k'].set_cord(to_square)
+                            if not self.is_in_check(foe_color):
+                                all_moves.append(Move(self, from_square, to_square, piece_name, captured_piece=piece))
+                            self.legal_moves.all.set_cord(from_square)
+                            self.legal_moves.pieces[piece].set_cord(to_square)
+                            self.legal_moves.ally.clear_cord(to_square)
+                            if piece_name == 'k':
+                                self.legal_moves.pieces[f'{self.color}k'].set_cord(from_square)
+                                self.legal_moves.pieces[f'{self.color}k'].clear_cord(to_square)
             
             # find non-capture moves
             for from_square, to_squares in moves.items():
 
                 # find moves that block checks
                 if check and not piece_name == 'k':
-                    to_squares = to_squares.find_same(save_squares)
+                    if check_count < 2:
+                        to_squares = to_squares.find_same(save_squares)
+                    else:
+                        to_squares.empty()
                 for to_square in to_squares.get_pos():
-                    all_moves.append(Move(self, from_square, to_square, piece_name))
+                    self.legal_moves.all.clear_cord(from_square)
+                    self.legal_moves.all.set_cord(to_square)
+                    if piece_name == 'k':
+                        self.legal_moves.pieces[f'{self.color}k'].clear_cord(from_square)
+                        self.legal_moves.pieces[f'{self.color}k'].set_cord(to_square)
+                    if not self.is_in_check(foe_color):
+                        all_moves.append(Move(self, from_square, to_square, piece_name))
+                    self.legal_moves.all.set_cord(from_square)
+                    self.legal_moves.all.clear_cord(to_square)
+                    if piece_name == 'k':
+                        self.legal_moves.pieces[f'{self.color}k'].set_cord(from_square)
+                        self.legal_moves.pieces[f'{self.color}k'].clear_cord(to_square)
             if piece_name == 'k':
                 self.legal_moves.all.combine(self.pieces[f'{self.color}k'])
         return all_moves
@@ -196,3 +240,8 @@ class Board:
 # moves = board.all_moves()
 # for bitboard in moves:
 #     print(bitboard)
+
+"""
+1. Cannot handle discover checkes done :)
+2. cannot handle king skews
+"""

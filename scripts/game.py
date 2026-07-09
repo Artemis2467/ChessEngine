@@ -1,13 +1,14 @@
 import pygame
 import sys
 import random
+import json
 
 from displayedBoard import DisplayedBoard
-from board import Board
+from board import Board, INIT_MAP
 
 
 class Chess:
-    def __init__(self):
+    def __init__(self, color='w', init_map=INIT_MAP):
 
         pygame.init()
         pygame.display.set_caption('Chess')
@@ -16,16 +17,18 @@ class Chess:
 
         self.clock = pygame.time.Clock()
 
-        self.color = "b"
+        self.init_map = init_map
 
-        self.board = Board(self.color)
+        self.color = color
+
+        self.board = Board(self.color, self.init_map)
 
         self.displayed_board = DisplayedBoard(self, self.board)
         
 
-    def run(self):
+    def run(self, examin_exception=True, show_only=False):
         count = 0
-        check_mate = False
+        check_mate = show_only
         while True:
             count += 1
             for event in pygame.event.get():
@@ -43,12 +46,23 @@ class Chess:
                 moves = self.board.all_moves()
 
                 try:
-                    self.board.move(moves[random.randint(0, len(moves) - 1)])
+                    self.board.move(moves[random.randint(0, len(moves) - 1 if len(moves) != 1 else 1)])
+                except IndexError:
+                    self.board.move(moves[0])
                 except Exception as e:
                     print(e)
                     check_mate = True
+                
+                if check_mate and examin_exception:
+                    board_holder = {'board': {}, 'color': self.board.legal_moves.color}
+                    for piece_name in self.board.pieces:
+                        board_holder['board'][piece_name] = self.board.pieces[piece_name].get_pos()
+                    with open('exception_examiner.json', 'w') as f:
+                        json.dump(board_holder, f)
+                
             
             pygame.display.update()
             self.clock.tick(60)
 
-Chess().run()
+if __name__ == "__main__":
+    Chess().run()
