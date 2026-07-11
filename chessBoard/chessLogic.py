@@ -1,5 +1,5 @@
 from __future__ import annotations
-from bitboard import Bitboard, CORD_MAP_INT
+from chessBoard.bitboard import Bitboard, CORD_MAP_INT
 
 KNIGHT_ATTACKS = [
     -17, -15, 15, 17, -10, -6, 6, 10
@@ -162,17 +162,10 @@ class FindLegalMove:
         pos = king.get_pos()[0]
         moves = self.moves.get_king_bitboard(pos)['move']
         all_func = self.get_all_moves()
-        all_moves = Bitboard()
-        for piece_name in all_func:
-            if piece_name != 'k':
-                piece_moves, captures = all_func[piece_name](self.pieces[f"{'w' if self.color == 'b' else 'b'}{piece_name}"])
-                for bitboard in piece_moves.values():
-                    all_moves.combine(bitboard)
-            else:
-                king_bitboard = self.moves.get_king_bitboard(self.pieces[f'{'w' if self.color == 'b' else 'b'}k'].get_pos()[0])['move']
-                moves.omit_same(king_bitboard)
 
-        moves.omit_same(all_moves)
+        king_bitboard = self.moves.get_king_bitboard(self.pieces[f'{'w' if self.color == 'b' else 'b'}k'].get_pos()[0])['move']
+        moves.omit_same(king_bitboard)
+
         captures = moves.find_same(self.foe)
         moves.omit_same(self.all)
         return {pos: moves}, {pos: captures}
@@ -198,7 +191,8 @@ class FindLegalMove:
             capture = self.moves.get_pawn_bitboard(pos, self.color)['attack']
             if check_king and capture.board & self.king.board:
                 return Bitboard([pos])
-            capture = capture.find_same(self.foe)
+            if not check_king:
+                capture = capture.find_same(self.foe)
 
             captures[pos] = capture
             moves[pos] = move

@@ -1,8 +1,9 @@
 COLOR_BLACK = '#B58863'
 COLOR_WHITE = '#F0D9B5'
 
-from utils import load_images
-from board import Board
+from chessBoard.utils import load_images, load_image
+from chessBoard.board import Board
+from chessBoard.move import Move
 import pygame
 
 class DisplayedBoard:
@@ -10,14 +11,13 @@ class DisplayedBoard:
         self.game = game
 
         self.board_tile = {
-            8 * row + col + 1: {"display_cord": (col * tile_size, row * tile_size), "surf": pygame.Surface((tile_size, tile_size)), 'color': COLOR_WHITE if (row + col) % 2 == 1 else COLOR_BLACK} for row in range(8) for col in range(8)
+            8 * row + col + 1: {"display_cord": (col * tile_size, row * tile_size), "surf": pygame.Surface((tile_size, tile_size)), 'color': COLOR_BLACK if (row + col) % 2 == 1 else COLOR_WHITE} for row in range(8) for col in range(8)
         }
 
         self.board = board
 
         self.piece_images = load_images('bases', tile_size)
-
-        self.moves = self.board.all_moves()
+        self.move_dot = load_image('move_dot.png')
 
     def display_board(self, surf):
         for col in range(8):
@@ -35,5 +35,10 @@ class DisplayedBoard:
             for cord in cords:
                 surf.blit(piece_surf, self.board_tile[cord]['display_cord'])    
 
-    def display_legal_moves(self, surf):
-        pass
+    def display_legal_moves(self, surf, from_square: int, moves: list[Move], ally_cords: set[int]):
+        to_squares: dict[int, Move] = {}
+        for move in moves:
+            if move.orig in ally_cords and move.orig == from_square:
+                to_squares[move.to] = move
+                surf.blit(self.move_dot, self.board_tile[move.to]['display_cord'])
+        return to_squares

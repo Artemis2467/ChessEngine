@@ -12,4 +12,5 @@ def load_images(path, tile_size):
 
 def load_image(path, tile_size=90)->pygame.Surface:
     image = pygame.transform.scale(pygame.image.load(ROOT_PATH + "/" + path), (tile_size, tile_size)).convert_alpha()
+    image.set_colorkey((255, 255, 255))
     return image

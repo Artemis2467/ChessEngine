@@ -16,93 +16,9 @@ INIT_MAP = {
     'bk': [5],
 }
 
-from bitboard import Bitboard, CORD_MAP_INT
-from chessLogic import StoreMoves, FindLegalMove
-
-class Move:
-    def __init__(self, board: Board, orig: int, to: int, piece: str, captured_piece: str | None=None):
-        
-        self.color = board.color
-        self.board = board
-        self.cur_color_piece = self.board.white_pieces if self.color == 'w' else self.board.black_pieces
-        self.other_color_piece = self.board.black_pieces if self.color == 'w' else self.board.white_pieces
-        
-        self.orig = orig
-        self.to = to
-        self.piece = piece
-
-        self.captured_piece = captured_piece
-
-    def __str__(self):
-        return f'piece: {self.piece} \n{Bitboard([self.orig, self.to])}'
-
-    def execute(self):
-        self.board.pieces[f'{self.color}{self.piece}'].clear_cord(self.orig)
-        if self.captured_piece:
-            self.board.pieces[self.captured_piece].clear_cord(self.to)
-        self.board.pieces[f'{self.color}{self.piece}'].set_cord(self.to)
-
-        self.cur_color_piece.clear_cord(self.orig)
-        if self.captured_piece:
-            self.other_color_piece.clear_cord(self.to)
-        self.cur_color_piece.set_cord(self.to)
-
-        self.board.all.clear_cord(self.orig)
-        self.board.all.set_cord(self.to)
-
-    def remove(self):
-        self.board.pieces[f'{self.color}{self.piece}'].set_cord(self.orig)
-        if self.captured_piece:
-            self.board.pieces[f'{'b' if self.color == 'w' else 'w'}{self.captured_piece}'].set_cord(self.to)
-        self.board.pieces[f'{self.color}{self.piece}'].clear_cord(self.to)
-
-        self.cur_color_piece.set_cord(self.orig)
-        if self.captured_piece:
-            self.other_color_piece.set_cord(self.to)
-        self.cur_color_piece.clear_cord(self.to)
-
-        self.board.all.set_cord(self.orig)
-        if not self.captured_piece:
-            self.board.all.clear_cord(self.to)
-
-    def display(self):
-        pass
-
-class Castle(Move):
-    def __init__(self, board: Board, is_short_castle: bool):
-        if board.color == 'w' and is_short_castle:
-            king_orig, king_to = 61, 63
-            rook_orig, rook_to = 64, 62
-        elif board.color == 'w' and not is_short_castle:
-            king_orig, king_to = 61, 59
-            rook_orig, rook_to = 57, 60
-        elif board.color == 'b' and is_short_castle:
-            king_orig, king_to = 5, 7
-            rook_orig, rook_to = 8, 6
-        elif board.color == 'b' and not is_short_castle:
-            king_orig, king_to = 5, 3
-            rook_orig, rook_to = 1, 4
-        
-        super().__init__(board, orig=king_orig, to=king_to, piece='k')
-        self.rook_orig, self.rook_to = rook_orig, rook_to
-        self.is_short_castle = is_short_castle
-
-    def execute(self):
-        super().execute()
-
-        self.board.pieces[f'{self.color}r'].clear_cord(self.rook_orig)
-        self.board.pieces[f'{self.color}r'].set_cord(self.rook_to)
-        
-        self.cur_color_piece.clear_cord(self.rook_orig)
-        self.cur_color_piece.set_cord(self.rook_to)
-
-        self.board.all.clear_cord(self.rook_orig)
-        self.board.all.set_cord(self.rook_to)
-
-    def __str__(self):
-        return f'{'short' if self.is_short_castle else 'long'} castle: \n{Bitboard([self.orig, self.to])}'
-
-
+from chessBoard.bitboard import Bitboard, CORD_MAP_INT
+from chessBoard.chessLogic import StoreMoves, FindLegalMove
+from chessBoard.move import Move, Castle, Promote, En_passant
 
 class Board:
     def __init__(self, color:str='w', init_map=INIT_MAP):
@@ -158,16 +74,20 @@ class Board:
             save_squares = Bitboard()
             foe_moves = Bitboard()
         all_func = self.legal_moves.get_all_moves()
-    
+
+        self.legal_moves.color = foe_color
         self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
         for piece_name in all_func:
             if piece_name != 'k':
                 check_bitboard: Bitboard | tuple = all_func[piece_name](self.pieces[f'{foe_color}{piece_name}'], check_king=True)
                 if not check and isinstance(check_bitboard, Bitboard):
+                    if not find_save_squares:
+                        self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
+                        self.legal_moves.color = self.color
+                        return True
                     check = True
-                    if find_save_squares:
-                        check_count = 1
-                        save_squares.combine(check_bitboard)
+                    check_count = 1
+                    save_squares.combine(check_bitboard)
                 elif find_save_squares and isinstance(check_bitboard, tuple):
                     moves, captures = check_bitboard
                     for from_square, to_squares in moves.items():
@@ -175,11 +95,9 @@ class Board:
                 elif isinstance(check_bitboard, Bitboard) and check:
                     check_count += 1
                     save_squares.combine(check_bitboard)
-                if check and not find_save_squares:
-                    self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
-                    return True
 
         self.legal_moves.foe, self.legal_moves.ally = self.legal_moves.ally, self.legal_moves.foe
+        self.legal_moves.color = self.color
 
         if not check and not find_save_squares:
             return False
@@ -199,40 +117,53 @@ class Board:
         for piece_name in all_func:
             if piece_name == 'k':
                 self.legal_moves.all.omit_same(self.pieces[f'{self.color}k']) # avoid king being in the path of attacking piece
+            
             moves, captures = all_func[piece_name](self.pieces[f'{self.color}{piece_name}'])
 
             # find capture moves
             for from_square, to_squares in captures.items():
+                promotion_possible = piece_name == 'p' and ((self.color == 'w' and 9 <= from_square <= 16) or (self.color == 'b' and 49 <= from_square <= 56))
 
                 # find checking piece capture
                 if check and not piece_name == 'k':
                     to_squares = to_squares.find_same(save_squares)
                     if check_count < 2:
                         to_squares = to_squares.find_same(save_squares)
-                    else:
+                    else: # discover checks cannot be solved by capturing or blocking, only by moving the king
                         to_squares.empty()
                 
                 # add capture moves
                 for to_square in to_squares.get_pos():
                     for piece in self.pieces:
-                        if list(piece)[0] == foe_color and (self.pieces[piece].board & CORD_MAP_INT[to_square]):
+                        if list(piece)[0] == foe_color and (self.pieces[piece].board & CORD_MAP_INT[to_square]): # find the captured piece
+                            
+                            # check if the move results the king being in check
                             self.legal_moves.all.clear_cord(from_square)
                             self.legal_moves.pieces[piece].clear_cord(to_square)
                             self.legal_moves.ally.set_cord(to_square)
-                            if piece_name == 'k':
+                            if piece_name == 'k': # keep the king from blocking future checks
                                 self.legal_moves.pieces[f'{self.color}k'].clear_cord(from_square)
                                 self.legal_moves.pieces[f'{self.color}k'].set_cord(to_square)
                             if not self.is_in_check(foe_color):
-                                all_moves.append(Move(self, from_square, to_square, piece_name, captured_piece=piece))
+                                # pawn promotion logic
+                                if promotion_possible:
+                                    for promoted_piece in all_func:
+                                        if promoted_piece not in {'k', 'p'}:
+                                            all_moves.append(Promote(self, from_square, to_square, promoted_piece=promoted_piece, captured_piece=piece))
+                                else:
+                                    all_moves.append(Move(self, from_square, to_square, piece_name, captured_piece=piece))
+                            # return to previous position
                             self.legal_moves.all.set_cord(from_square)
                             self.legal_moves.pieces[piece].set_cord(to_square)
                             self.legal_moves.ally.clear_cord(to_square)
                             if piece_name == 'k':
                                 self.legal_moves.pieces[f'{self.color}k'].set_cord(from_square)
                                 self.legal_moves.pieces[f'{self.color}k'].clear_cord(to_square)
+                            
             
             # find non-capture moves
             for from_square, to_squares in moves.items():
+                promotion_possible = piece_name == 'p' and ((self.color == 'w' and 9 <= from_square <= 16) or (self.color == 'b' and 49 <= from_square <= 56))
 
                 # find moves that block checks
                 if check and not piece_name == 'k':
@@ -247,7 +178,12 @@ class Board:
                         self.legal_moves.pieces[f'{self.color}k'].clear_cord(from_square)
                         self.legal_moves.pieces[f'{self.color}k'].set_cord(to_square)
                     if not self.is_in_check(foe_color):
-                        all_moves.append(Move(self, from_square, to_square, piece_name))
+                        if promotion_possible:
+                            for promoted_piece in all_func:
+                                if promoted_piece not in {'k', 'p'}:
+                                    all_moves.append(Promote(self, from_square, to_square, promoted_piece=promoted_piece))
+                        else:
+                            all_moves.append(Move(self, from_square, to_square, piece_name))
                     self.legal_moves.all.set_cord(from_square)
                     self.legal_moves.all.clear_cord(to_square)
                     if piece_name == 'k':
@@ -258,12 +194,11 @@ class Board:
 
         # castle
         king_pos = self.pieces[f"{self.color}k"].get_pos()[0]
-        castle_squares = self.moves.get_king_bitboard(king_pos)['castle'][self.color]['short']
-        castle_condition = not check and not castle_squares.find_same(foe_moves) and not castle_squares.find_same(self.all)
-        if castle_condition and self.castle_possible[self.color]['short']:
+        castle_squares = self.moves.get_king_bitboard(king_pos)['castle'][self.color]['short'] # check conditions
+        if not check and not castle_squares.find_same(foe_moves) and not castle_squares.find_same(self.all) and self.castle_possible[self.color]['short']:
             all_moves.append(Castle(self, is_short_castle=True))
         castle_squares = self.moves.get_king_bitboard(king_pos)['castle'][self.color]['long']
-        if castle_condition and self.castle_possible[self.color]['long']:
+        if not check and not castle_squares.find_same(foe_moves) and not castle_squares.find_same(self.all) and self.castle_possible[self.color]['long']:
             all_moves.append(Castle(self, is_short_castle=False))
         
         return all_moves
@@ -290,9 +225,4 @@ class Board:
                     self.castle_possible['b']['short'] = False
 
         self.color = 'w' if self.color == 'b' else 'b'
-        self.legal_moves = FindLegalMove(self, self.moves, self.color)
-
-# board = Board(color='b')
-# moves = board.all_moves()
-# for bitboard in moves:
-#     print(bitboard)
+        self.legal_moves = FindLegalMove(self, StoreMoves(), self.color)
