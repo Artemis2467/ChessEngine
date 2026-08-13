@@ -1,5 +1,5 @@
 from __future__ import annotations
-from chessBoard.bitboard import Bitboard, CORD_MAP_INT
+from environment.bitboard import Bitboard, CORD_MAP_INT
 
 KNIGHT_ATTACKS = [
     -17, -15, 15, 17, -10, -6, 6, 10

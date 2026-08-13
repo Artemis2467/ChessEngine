@@ -3,8 +3,8 @@ import sys
 import random
 import json
 
-from chessBoard.displayedBoard import DisplayedBoard
-from chessBoard.board import Board, INIT_MAP
+from display.displayedBoard import DisplayedBoard
+from environment.board import Board, INIT_MAP
 
 
 class Game:

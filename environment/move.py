@@ -1,4 +1,4 @@
-from chessBoard.bitboard import Bitboard
+from environment.bitboard import Bitboard
 
 class Move:
     def __init__(self, board, orig: int, to: int, piece: str, captured_piece: str | None=None):

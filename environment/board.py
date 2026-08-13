@@ -16,9 +16,9 @@ INIT_MAP = {
     'bk': [5],
 }
 
-from chessBoard.bitboard import Bitboard, CORD_MAP_INT
-from chessBoard.chessLogic import StoreMoves, FindLegalMove
-from chessBoard.move import Move, Castle, Promote, En_passant
+from environment.bitboard import Bitboard, CORD_MAP_INT
+from environment.chessLogic import StoreMoves, FindLegalMove
+from environment.move import Move, Castle, Promote, En_passant
 
 class Board:
     def __init__(self, color:str='w', init_map=INIT_MAP):

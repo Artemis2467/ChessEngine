@@ -1,9 +1,9 @@
 COLOR_BLACK = '#B58863'
 COLOR_WHITE = '#F0D9B5'
 
-from chessBoard.utils import load_images, load_image
-from chessBoard.board import Board
-from chessBoard.move import Move
+from display.utils import load_images, load_image
+from environment.board import Board
+from environment.move import Move
 import pygame
 
 class DisplayedBoard:
