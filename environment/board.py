@@ -1,20 +1,37 @@
 from __future__ import annotations
 from typing import overload, Union, Literal
 
+# INIT_MAP = {
+#     'wp': [i for i in range(49, 57)],
+#     'wr': [57, 64],
+#     'wn': [58, 63],
+#     'wb': [59, 62],
+#     'wq': [60],
+#     'wk': [61],
+#     'bp': [i for i in range(9, 17)],
+#     'br': [1, 8],
+#     'bn': [2, 7],
+#     'bb': [3, 6],
+#     'bq': [4],
+#     'bk': [5],
+# }
+
+
 INIT_MAP = {
-    'wp': [i for i in range(49, 57)],
-    'wr': [57, 64],
-    'wn': [58, 63],
-    'wb': [59, 62],
-    'wq': [60],
+    'wp': [25],
+    'wr': [30],
+    'wn': [],
+    'wb': [],
+    'wq': [],
     'wk': [61],
-    'bp': [i for i in range(9, 17)],
-    'br': [1, 8],
-    'bn': [2, 7],
-    'bb': [3, 6],
-    'bq': [4],
+    'bp': [],
+    'br': [],
+    'bn': [],
+    'bb': [],
+    'bq': [32],
     'bk': [5],
 }
+
 
 from environment.bitboard import Bitboard, CORD_MAP_INT
 from environment.chessLogic import StoreMoves, FindLegalMove
@@ -57,6 +74,17 @@ class Board:
         self.legal_moves = FindLegalMove(self, self.moves, self.color)
 
         self.castle_possible = {'b': {'long': True, 'short': True}, 'w': {'long': True, 'short': True}}
+
+    def get_piece(self, pos:int, color:str | None=None):
+        if color:
+            for piece_type in self.pieces:
+                if piece_type[0] == color and pos in self.pieces[piece_type].get_pos():
+                    return piece_type
+        else:
+            for piece_type in self.pieces:
+                if pos in self.pieces[piece_type].get_pos():
+                    return piece_type
+        return None
 
     def __str__(self):
         return str(self.all)

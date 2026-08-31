@@ -1,2 +1,2 @@
-from chessBoard.board import Board
+from environment.board import Board
 
