@@ -1,7 +1,8 @@
 from environment.bitboard import Bitboard
 
 class Move:
-    def __init__(self, board, orig: int, to: int, piece: str, captured_piece: str | None=None):
+    def __init__(self, board, orig: int, to: int, piece: str, captured_piece: str | None=None): 
+        # piece can only be q, k, n, b, r, p, no color is needed
         
         self.color = board.color
         self.board = board
@@ -114,4 +115,22 @@ class Promote(Move):
 
 class En_passant(Move):
     def __init__(self, board, orig: int, to: int):
-        super().__init__(board, orig, to, piece='p', captured_piece='p')
+        super().__init__(board, orig, to, piece='p', captured_piece=f'{'w' if board.color == 'b' else 'b'}p')
+        self.captured_square = self.to + 8 if self.board.color == 'w' else self.to - 8
+
+    def __str__(self):
+        return super().__str__()
+
+    def execute(self):
+
+        self.board.pieces[f'{self.color}{self.piece}'].clear_cord(self.orig)
+        self.board.pieces[self.captured_piece].clear_cord(self.captured_square)
+        self.board.pieces[f'{self.color}{self.piece}'].set_cord(self.to)
+
+        self.cur_color_piece.clear_cord(self.orig)
+        self.other_color_piece.clear_cord(self.captured_square)
+        self.cur_color_piece.set_cord(self.to)
+
+        self.board.all.clear_cord(self.orig)
+        self.board.all.clear_cord(self.captured_square)
+        self.board.all.set_cord(self.to)

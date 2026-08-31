@@ -69,6 +69,8 @@ class Board:
         self.all = Bitboard()
         self.all.combine(self.white_pieces, self.black_pieces)
 
+        self.sequence: list[Move] = []
+
         self.moves = StoreMoves()
 
         self.legal_moves = FindLegalMove(self, self.moves, self.color)
@@ -79,15 +81,46 @@ class Board:
         if color:
             for piece_type in self.pieces:
                 if piece_type[0] == color and pos in self.pieces[piece_type].get_pos():
-                    return piece_type
+                    return piece_type[1]
         else:
             for piece_type in self.pieces:
                 if pos in self.pieces[piece_type].get_pos():
-                    return piece_type
+                    return piece_type[1]
         return None
 
     def __str__(self):
         return str(self.all)
+
+    def en_passant(self):
+        last_move = self.sequence[-1]
+        if last_move.piece == 'p':
+            if self.color == 'w' and 9 <= last_move.orig <= 16 and 25 <= last_move.to <= 32:
+
+                # left side of target pawn not the edge of the board
+                if last_move.to % 8 != 1:
+                    en_passant_pawn_square = Bitboard([last_move.to - 1])
+                    if self.pieces['wp'].find_same(en_passant_pawn_square):
+                        return En_passant(self, orig=last_move.to - 1, to=last_move.to - 8)
+
+                # right side of pawn not the edge of the board
+                if last_move.to % 8 != 0:
+                    en_passant_pawn_square = Bitboard([last_move.to + 1])
+                    if self.pieces['wp'].find_same(en_passant_pawn_square):
+                        return En_passant(self, orig=last_move.to + 1, to=last_move.to - 8)
+
+            if self.color == 'b' and 49 <= last_move.orig <= 56 and 33 <= last_move.to <= 40:
+
+                if last_move.to % 8 != 1:
+                    en_passant_pawn_square = Bitboard([last_move.to - 1])
+                    if self.pieces['bp'].find_same(en_passant_pawn_square):
+                        return En_passant(self, orig=last_move - 1, to=last_move.to + 8)
+
+                if last_move.to % 8 != 0:
+                    en_passant_pawn_square = Bitboard([last_move.to + 1])
+                    if self.pieces['bp'].find_same(en_passant_pawn_square):
+                        return En_passant(self, orig=last_move.to + 1, to=last_move.to + 8)
+
+        return None
     
     @overload
     def is_in_check(self, foe_color, find_save_squares: Literal[False]=False)->bool: ...
@@ -220,14 +253,20 @@ class Board:
             if piece_name == 'k':
                 self.legal_moves.all.combine(self.pieces[f'{self.color}k'])
 
-        # castle
-        king_pos = self.pieces[f"{self.color}k"].get_pos()[0]
-        castle_squares = self.moves.get_king_bitboard(king_pos)['castle'][self.color]['short'] # check conditions
-        if not check and not castle_squares.find_same(foe_moves) and not castle_squares.find_same(self.all) and self.castle_possible[self.color]['short']:
-            all_moves.append(Castle(self, is_short_castle=True))
-        castle_squares = self.moves.get_king_bitboard(king_pos)['castle'][self.color]['long']
-        if not check and not castle_squares.find_same(foe_moves) and not castle_squares.find_same(self.all) and self.castle_possible[self.color]['long']:
-            all_moves.append(Castle(self, is_short_castle=False))
+        if not check:
+            # castle
+            king_pos = self.pieces[f"{self.color}k"].get_pos()[0]
+            castle_squares = self.moves.get_king_bitboard(king_pos)['castle'][self.color]['short'] # check conditions
+            if not castle_squares.find_same(foe_moves) and not castle_squares.find_same(self.all) and self.castle_possible[self.color]['short']:
+                all_moves.append(Castle(self, is_short_castle=True))
+            castle_squares = self.moves.get_king_bitboard(king_pos)['castle'][self.color]['long']
+            if not castle_squares.find_same(foe_moves) and not castle_squares.find_same(self.all) and self.castle_possible[self.color]['long']:
+                all_moves.append(Castle(self, is_short_castle=False))
+
+            # en passant
+            en_passant = self.en_passant()
+            if isinstance(en_passant, En_passant):
+                all_moves.append(en_passant)
         
         return all_moves
     
@@ -254,3 +293,4 @@ class Board:
 
         self.color = 'w' if self.color == 'b' else 'b'
         self.legal_moves = FindLegalMove(self, StoreMoves(), self.color)
+        self.sequence.append(move)

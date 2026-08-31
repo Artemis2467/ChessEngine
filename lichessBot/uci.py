@@ -11,6 +11,9 @@ class Uci:
 
     def add_move_uci(self, move: Move):
         move_uci = f'{self.int_to_cord[move.orig]}{self.int_to_cord[move.to]}'
+        if isinstance(move, Promote):
+            move_uci = move_uci + move.promoted_piece
+
         self.game.append(move_uci)
 
         return move_uci
