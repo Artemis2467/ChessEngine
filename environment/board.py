@@ -18,8 +18,8 @@ from typing import overload, Union, Literal
 
 
 INIT_MAP = {
-    'wp': [25],
-    'wr': [30],
+    'wp': [35],
+    'wr': [49],
     'wn': [],
     'wb': [],
     'wq': [],
@@ -28,8 +28,8 @@ INIT_MAP = {
     'br': [],
     'bn': [],
     'bb': [],
-    'bq': [32],
-    'bk': [5],
+    'bq': [40],
+    'bk': [2],
 }
 
 
@@ -92,7 +92,10 @@ class Board:
         return str(self.all)
 
     def en_passant(self):
-        last_move = self.sequence[-1]
+        try:
+            last_move = self.sequence[-1]
+        except IndexError:
+            return None
         if last_move.piece == 'p':
             if self.color == 'w' and 9 <= last_move.orig <= 16 and 25 <= last_move.to <= 32:
 
@@ -190,7 +193,7 @@ class Board:
                     to_squares = to_squares.find_same(save_squares)
                     if check_count < 2:
                         to_squares = to_squares.find_same(save_squares)
-                    else: # discover checks cannot be solved by capturing or blocking, only by moving the king
+                    else: # double checks cannot be solved by capturing or blocking, only by moving the king
                         to_squares.empty()
                 
                 # add capture moves

@@ -214,9 +214,9 @@ class FindLegalMove:
             capture = []
             direction_args = [
                 (rook_pos + 1, 8 * row + 1), (rook_pos - 1, 8 * (row - 1), -1), (rook_pos - 8, col - 1, -8), (rook_pos + 8, 57 + col, 8)
-            ]
+            ] # iterate through directions
             for direction in direction_args:
-                first_overlap = 0
+                first_overlap = 0 # overlap square
                 if check_king:
                     connecting_line = [rook_pos]
                 for square in range(*direction):
@@ -321,6 +321,8 @@ class FindLegalMove:
                 if check_king:
                     connecting_line = [queen_pos]
                 for square in range(*direction):
+                    if square % 8 == 0 or square % 8 == 1:
+                        break
                     if square in overlapped and not first_overlap:
                         first_overlap = square
                         if check_king and CORD_MAP_INT[first_overlap] & self.king.board:
@@ -329,16 +331,13 @@ class FindLegalMove:
                         connecting_line.append(square)
                     if first_overlap:
                         blocked.append(square)
-                    if square % 8 == 0 or square % 8 == 1:
-                        break
                 if first_overlap in overlapped_foe:
+                    print(first_overlap)
                     capture.append(first_overlap)
 
             blocked = Bitboard(blocked)
-
             move.omit_same(blocked)
-
-            moves[queen_pos] = move 
+            moves[queen_pos] = move
 
             captures[queen_pos] = Bitboard(capture)
 

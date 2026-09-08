@@ -47,9 +47,6 @@ class Move:
         if not self.captured_piece:
             self.board.all.clear_cord(self.to)
 
-    def display(self):
-        pass
-
 class Castle(Move):
     def __init__(self, board, is_short_castle: bool):
         if board.color == 'w' and is_short_castle:
