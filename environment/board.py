@@ -1,37 +1,20 @@
 from __future__ import annotations
 from typing import overload, Union, Literal
 
-# INIT_MAP = {
-#     'wp': [i for i in range(49, 57)],
-#     'wr': [57, 64],
-#     'wn': [58, 63],
-#     'wb': [59, 62],
-#     'wq': [60],
-#     'wk': [61],
-#     'bp': [i for i in range(9, 17)],
-#     'br': [1, 8],
-#     'bn': [2, 7],
-#     'bb': [3, 6],
-#     'bq': [4],
-#     'bk': [5],
-# }
-
-
 INIT_MAP = {
-    'wp': [35],
-    'wr': [49],
-    'wn': [],
-    'wb': [],
-    'wq': [],
+    'wp': [i for i in range(49, 57)],
+    'wr': [57, 64],
+    'wn': [58, 63],
+    'wb': [59, 62],
+    'wq': [60],
     'wk': [61],
-    'bp': [],
-    'br': [],
-    'bn': [],
-    'bb': [],
-    'bq': [40],
-    'bk': [2],
+    'bp': [i for i in range(9, 17)],
+    'br': [1, 8],
+    'bn': [2, 7],
+    'bb': [3, 6],
+    'bq': [4],
+    'bk': [5],
 }
-
 
 from environment.bitboard import Bitboard, CORD_MAP_INT
 from environment.chessLogic import StoreMoves, FindLegalMove

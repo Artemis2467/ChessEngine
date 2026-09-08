@@ -332,7 +332,6 @@ class FindLegalMove:
                     if first_overlap:
                         blocked.append(square)
                 if first_overlap in overlapped_foe:
-                    print(first_overlap)
                     capture.append(first_overlap)
 
             blocked = Bitboard(blocked)
