@@ -278,5 +278,5 @@ class Board:
                     self.castle_possible['b']['short'] = False
 
         self.color = 'w' if self.color == 'b' else 'b'
-        self.legal_moves = FindLegalMove(self, StoreMoves(), self.color)
+        self.legal_moves = FindLegalMove(self, self.moves, self.color)
         self.sequence.append(move)

@@ -50,7 +50,7 @@ class StoreMoves:
                 b_attacks.append(b_attack)
                 b_attack += 9
             b_attack = pos + 7
-            while b_attack <= 64 and b_attack % 8 != 0:
+            while col > 1 and b_attack <= 64 and b_attack % 8 != 0:
                 b_attacks.append(b_attack)
                 b_attack += 7        
             self.all_moves['b'][pos] = Bitboard(b_attacks)
@@ -59,18 +59,6 @@ class StoreMoves:
             q_attacks = Bitboard()
             q_attacks.combine(self.all_moves['b'][pos], self.all_moves['r'][pos])
             self.all_moves['q'][pos] = q_attacks
-
-            # king
-            k_attacks = []
-            for attack_offset in KING_ATTACKS:
-                k_attack = pos + attack_offset
-                attack_col = k_attack % 8
-                if 1 <= k_attack <= 64 and not ((col == 1 and attack_col == 0) or (col == 8 and attack_col == 1)):
-                    k_attacks.append(k_attack)
-
-            wcastle = {'long': Bitboard([i for i in range(59, 61)]), 'short': Bitboard([i for i in range(62, 64)])}
-            bcastle = {'long': Bitboard([i for i in range(3, 5)]), 'short': Bitboard([i for i in range(6, 8)])}
-            self.all_moves['k'][pos] = {'move': Bitboard(k_attacks), 'castle': {'b': bcastle, 'w': wcastle}}
 
             # pawn white
             wpawn_moves = []
@@ -115,13 +103,25 @@ class StoreMoves:
                 self.all_moves['p']['b'][pos] = {"move": Bitboard(bpawn_moves), "attack": Bitboard(bpawn_attacks), 'en_passant': Bitboard(en_passant)}
     
     def get_king_bitboard(self, pos: int)->dict:
-        return self.all_moves['k'][pos].copy()
+        k_attacks = []
+        col = pos % 8 if pos % 8 != 0 else 8
+
+        for attack_offset in KING_ATTACKS:
+            k_attack = pos + attack_offset
+            attack_col = k_attack % 8
+            if 1 <= k_attack <= 64 and not ((col == 1 and attack_col == 0) or (col == 8 and attack_col == 1)):
+                k_attacks.append(k_attack)
+        
+        wcastle = {'long': Bitboard([i for i in range(59, 61)]), 'short': Bitboard([i for i in range(62, 64)])}
+        bcastle = {'long': Bitboard([i for i in range(3, 5)]), 'short': Bitboard([i for i in range(6, 8)])}
+        return {'move': Bitboard(k_attacks), 'castle': {'b': bcastle, 'w': wcastle}}
     
     def get_knight_bitboard(self, pos: int)->Bitboard:
         return self.all_moves['n'][pos].copy()
     
     def get_pawn_bitboard(self, pos: int, color: str)->dict[str, Bitboard]:
-        return self.all_moves['p'][color][pos].copy()
+        pawn_moves = self.all_moves['p'][color][pos]
+        return {move_type: bitboard.copy() for move_type, bitboard in pawn_moves.items()}
     
     # sliding pieces
     def get_rook_bitboard(self, pos: int)->Bitboard:
@@ -175,9 +175,10 @@ class FindLegalMove:
         moves = {}
         captures = {}
         for pos in positions:
+            possible_moves = self.moves.get_pawn_bitboard(pos, self.color)
 
             ## move
-            move = self.moves.get_pawn_bitboard(pos, self.color)['move']
+            move = possible_moves['move']
             overlap = move.find_same(self.all)
             if overlap:  
                 if self.color == 'w' and 49 <= pos <= 56 and overlap.get_pos()[0] == pos - 8:
@@ -188,7 +189,7 @@ class FindLegalMove:
                     move.omit_same(self.all)
 
             ## captures
-            capture = self.moves.get_pawn_bitboard(pos, self.color)['attack']
+            capture = possible_moves['attack']
             if check_king and capture.board & self.king.board:
                 return Bitboard([pos])
             if not check_king:
@@ -301,6 +302,11 @@ class FindLegalMove:
             biship_direction_args = [
                 (queen_pos - 7, 0, -7), (queen_pos + 9, 65, 9), (queen_pos - 9, 0, -9), (queen_pos + 7, 65, 7),
             ]
+            bishop_attacks = set(self.moves.get_biship_bitboard(queen_pos).get_pos())
+            biship_direction_args = [
+                direction for direction in biship_direction_args
+                if direction[0] in bishop_attacks
+            ]
             for direction in rook_direction_args:
                 first_overlap = 0
                 if check_king:
@@ -321,8 +327,6 @@ class FindLegalMove:
                 if check_king:
                     connecting_line = [queen_pos]
                 for square in range(*direction):
-                    if square % 8 == 0 or square % 8 == 1:
-                        break
                     if square in overlapped and not first_overlap:
                         first_overlap = square
                         if check_king and CORD_MAP_INT[first_overlap] & self.king.board:
@@ -331,6 +335,8 @@ class FindLegalMove:
                         connecting_line.append(square)
                     if first_overlap:
                         blocked.append(square)
+                    if square % 8 == 0 or square % 8 == 1:
+                        break
                 if first_overlap in overlapped_foe:
                     capture.append(first_overlap)
 
@@ -352,18 +358,3 @@ class FindLegalMove:
             'p': self.pawn_move,
         }
         return all_moves
-    
-# from board import Board
-# board = Board()
-# stored_moves = StoreMoves()
-# legal_moves = FindLegalMove(board, stored_moves, color='b')
-
-# print(legal_moves.all)
-# print('\n')
-# print(legal_moves.foe)
-# print('\n')
-# print(legal_moves.ally)
-
-# # moves, captures = legal_moves.king_move(board.pieces['bk'])
-# # for from_square, to_squares in moves.items():
-# #     print(to_squares)
