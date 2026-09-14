@@ -1,12 +1,17 @@
+from dotenv import load_dotenv
 import os
 import random
 import json
 import requests
-from uci import Uci
+from lichessBot.uci import Uci
+from environment.board import Board
+from environment.move import Move
 
+load_dotenv()
 API_TOKEN = os.getenv("API_TOKEN")
+END_STATUS = {'aborted', 'mate', 'resign', 'stalemate', 'timeout', 'draw', 'outoftime', 'cheat', 'noStart', 'unknownFinish', 'insufficientMaterialClaim'}
 
-class lichessBot:
+class LichessBot:
     def __init__(self, base_time: int, increment: int, cur_rating: int, rating_range: int = 100, batch_size: int = 3, is_rated: bool = True):
         """base_time and increment are counted by seconds"""
 
@@ -35,6 +40,12 @@ class lichessBot:
 
         self.batch_size = batch_size
         self.is_rated = is_rated
+
+        self.game_present = False
+        self.game_id = ''
+        self.color = ''
+        self.board = None
+        self.uci_interpreter = None
 
     def choose_in_challenges(self, challenge_list_resp) -> str:
         challenge_list = challenge_list_resp.json()
@@ -96,11 +107,10 @@ class lichessBot:
             print('challenge sent')
             return challenge_id
         except Exception:
-            print(challenge_resp['error'])
-            print('continuing to next opponent...')
+            print(f'An error has occured: {challenge_resp['error']}')
             return ''
 
-    def opponent_batches(self, opponent_ids: list[str]):
+    def opponent_batches(self, opponent_ids: list[str]) -> iter:
         random.shuffle(opponent_ids)    
         batch = []
         for opponent_id in opponent_ids:
@@ -113,9 +123,9 @@ class lichessBot:
         if batch:
             yield batch
 
-    def cancel_challenges(self, challenge_ids, game_id=''):
+    def cancel_challenges(self, challenge_ids) -> None:
         for challenge_id in challenge_ids:
-            if challenge_id and challenge_id != game_id:
+            if challenge_id and challenge_id != self.game_id:
                 cancel_resp = requests.post(
                     f"https://lichess.org/api/challenge/{challenge_id}/cancel",
                     headers=self.headers,
@@ -124,20 +134,19 @@ class lichessBot:
                     cancel_successful = cancel_resp['ok']
                     print('Challenge cancelled successfully')
                 except Exception:
-                    print('Cancel challenge failed')
+                    print('Challenge already cancelled')
 
-    def get_game(self):
+    def get_game(self) -> None:
         challenge_list_resp = requests.get("https://lichess.org/api/challenge",
             headers=self.headers
         )
         print('challenge_list request successful')
-
-        game_id = self.choose_in_challenges(challenge_list_resp, self.time_control, self.cur_rating, self.rating_range)
+        self.game_id = self.choose_in_challenges(challenge_list_resp)
         in_challenge_successfull = False
 
-        if game_id:
+        if self.game_id:
             in_challenge_successfull = requests.post(
-                f"https://lichess.org/api/challenge/{game_id}/accept",
+                f"https://lichess.org/api/challenge/{self.game_id}/accept",
                 headers=self.headers
             )
 
@@ -147,17 +156,16 @@ class lichessBot:
             except Exception:
                 print('in challenge cancelled')
 
-        if not game_id or not in_challenge_successfull:
-            num_bot_resp = requests.get("https://lichess.org/api/bot/online?nb=512")
+        if not self.game_id or not in_challenge_successfull:
+            num_bot_resp = requests.get("https://lichess.org/api/bot/online?nb=100")
             print('online bots request successful')
-            opponent_ids = self.get_opponents(num_bot_resp, self.time_control, self.cur_rating, self.rating_range)
-            game_found = False
+            opponent_ids = self.get_opponents(num_bot_resp)
 
-            for opponent_batch in self.opponent_batches(opponent_ids, batch_size=self.batch_size):
+            for opponent_batch in self.opponent_batches(opponent_ids):
                 challenge_ids = []
 
                 for opponent_id in opponent_batch:
-                    challenge_id = self.challenge_opponent(opponent_id, is_rated=self.is_rated, base_time=self.base_time, increment=self.increment)
+                    challenge_id = self.challenge_opponent(opponent_id)
                     challenge_ids.append(challenge_id)
 
                 with requests.get("https://lichess.org/api/stream/event", headers=self.headers, stream=True) as resp:
@@ -168,11 +176,12 @@ class lichessBot:
                             game = json.loads(event)
 
                             if game['type'] == 'gameStart':
-                                game_id, color = game['game']['gameId'], game['game']['color']
-                                game_found = True
-                                print(game_id)
+                                self.game_id, self.color = game['game']['gameId'], 'w' if game['game']['color'] == 'white' else 'b'
+                                self.game_present = True
+                                self.board = Board(self.color)
+                                self.uci_interpreter = Uci(self.board)
 
-                                self.cancel_challenges(challenge_ids, game_id)
+                                self.cancel_challenges(challenge_ids)
                                 break
                             
                         else:
@@ -185,15 +194,57 @@ class lichessBot:
                                 print('---Starting next round---')
                                 break
             
-                if game_found:
+                if self.game_present:
                     break
-        if game_found:
-            return game_id, color
+        if self.game_present:
+            return
         else:
             self.get_game()
 
-    def get_move(self):
-        pass
+    def pending_move(self) -> Move | None:
+        with requests.get(f"https://lichess.org/api/bot/game/stream/{self.game_id}",headers=self.headers, stream=True) as resp:
 
-    def make_move(self):
-        pass
+            for event in resp.iter_lines():
+                if event:
+                    event = json.loads(event)
+
+                    try:
+                        event_type = event['type']
+                    except KeyError:
+                        raise RuntimeError("Wrong game ID or internet connection issues")
+
+                    if event_type == 'gameFull':
+                        event = event['state']
+                        event_type = 'gameState'
+
+                    if event_type == "gameState":
+                        move_sequence: str = event['moves']
+                        move: Move = self.uci_interpreter.get_move_from_uci(move_sequence)
+                        if isinstance(move, Move):
+                            if event['status'] in END_STATUS:
+                                self.game_present = False
+                            return move
+                        else:
+                            raise RuntimeError("Unable to resolve uci -> " + move_sequence)
+                        
+                    if event_type == "opponentGone":
+                        if event['claimWinInSeconds'] <= 0:
+                            self.game_present = False
+                            requests.post(
+                                f"https://lichess.org/api/bot/game/{self.game_id}/claim-draw",
+                                headers=self.headers
+                            )
+                            return 
+
+    def make_move(self, move: Move):
+        if self.game_present:
+            move_uci = self.uci_interpreter.add_move_uci(move)
+            move_resp = requests.post(
+                f"https://lichess.org/api/bot/game/{self.game_id}/move/{move_uci}",
+                headers=self.headers
+            )
+            try:
+                move_made_successful = move_resp.json()['ok']
+            except KeyError:
+                raise RuntimeError(f"Problem with request code or problem with enviroment logic. Move uci: {move_uci}")
+            

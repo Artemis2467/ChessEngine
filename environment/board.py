@@ -60,15 +60,10 @@ class Board:
 
         self.castle_possible = {'b': {'long': True, 'short': True}, 'w': {'long': True, 'short': True}}
 
-    def get_piece(self, pos:int, color:str | None=None):
-        if color:
-            for piece_type in self.pieces:
-                if piece_type[0] == color and pos in self.pieces[piece_type].get_pos():
-                    return piece_type[1]
-        else:
-            for piece_type in self.pieces:
-                if pos in self.pieces[piece_type].get_pos():
-                    return piece_type[1]
+    def get_piece(self, pos:int):
+        for piece_type in self.pieces:
+            if pos in self.pieces[piece_type].get_pos():
+                return piece_type[1]
         return None
 
     def __str__(self):

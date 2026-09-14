@@ -61,7 +61,3 @@ class Bitboard:
     
     def empty(self):
         self.board = 0
-
-
-
-        
