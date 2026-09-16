@@ -3,7 +3,7 @@ from time import sleep
 from lichessBot.bot import LichessBot
 from agent.testAgent import TestAgent
 
-RETRY_MAX = 100
+RETRY_MAX = 10
 
 if __name__ == "__main__":
     agent = TestAgent()
@@ -14,6 +14,7 @@ if __name__ == "__main__":
         try:
             retry_count = RETRY_MAX
             bot.get_game()
+            print(bot.color)
             if bot.color == 'w':
                 moves = bot.board.all_moves()
                 agent_move = agent.choose_action(moves)

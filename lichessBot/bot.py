@@ -178,7 +178,7 @@ class LichessBot:
                             if game['type'] == 'gameStart':
                                 self.game_id, self.color = game['game']['gameId'], 'w' if game['game']['color'] == 'white' else 'b'
                                 self.game_present = True
-                                self.board = Board(self.color)
+                                self.board = Board()
                                 self.uci_interpreter = Uci(self.board)
 
                                 self.cancel_challenges(challenge_ids)
@@ -220,12 +220,12 @@ class LichessBot:
                     if event_type == "gameState":
                         move_sequence: str = event['moves']
                         move: Move = self.uci_interpreter.get_move_from_uci(move_sequence)
+                        if event['status'] in END_STATUS:
+                            self.game_present = False
                         if isinstance(move, Move):
-                            if event['status'] in END_STATUS:
-                                self.game_present = False
                             return move
                         else:
-                            raise RuntimeError("Unable to resolve uci -> " + move_sequence)
+                            continue
                         
                     if event_type == "opponentGone":
                         if event['claimWinInSeconds'] <= 0:

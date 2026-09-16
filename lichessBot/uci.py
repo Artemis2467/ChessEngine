@@ -19,6 +19,9 @@ class Uci:
         return move_uci
 
     def get_move_from_uci(self, move_sequence: str) -> Move:
+        if not move_sequence or move_sequence == " ".join(self.game_sequence):
+            return None
+        
         move_uci = move_sequence.split()[-1]
         self.game_sequence.append(move_uci)
         orig = self.cord_to_int[move_uci[0] + move_uci[1]]
@@ -27,7 +30,7 @@ class Uci:
         piece_moved = self.board.get_piece(orig)
         piece_captured = self.board.get_piece(to)
         if piece_captured:
-            piece_captured = f"{self.board.color}{self.board.get_piece(to)}" # piece captured can be None
+            piece_captured = f"{"b" if self.board.color == "w" else "w"}{self.board.get_piece(to)}" # piece captured can be None
 
         if piece_moved == 'p':
             # promotion
@@ -35,7 +38,7 @@ class Uci:
                 return Promote(self.board, orig, to, promoted_piece=move_uci[4], captured_piece=piece_captured)
 
             # en-passant
-            if not piece_captured and ((self.board.color == 'w' and 25 <= orig <= 32 and 17 <= to <= 24) or (self.board.color == 'b' and 33 <= orig <= 40 and 41 <= to <= 48)):
+            if not piece_captured and ((self.board.color == 'w' and 25 <= orig <= 32 and (to == orig - 7 or to == orig - 9)) or (self.board.color == 'b' and 33 <= orig <= 40 and (to == orig + 9 or to == orig + 7))):
                 return En_passant(self.board, orig, to)
         if piece_moved == 'k' and (orig == 5 and (to == 7 or to == 3)) or (orig == 61 and (to == 63 or to == 59)):
             return Castle(self.board, is_short_castle=(to == 7 or to == 63))
