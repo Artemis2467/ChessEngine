@@ -7,12 +7,14 @@ RETRY_MAX = 10
 
 if __name__ == "__main__":
     agent = TestAgent()
-    bot = LichessBot(base_time=900, increment=10, cur_rating=1500, is_rated=False)
+    bot = LichessBot(base_time=900, increment=10, cur_rating=1500, is_rated=True)
 
     while True:
 
         try:
             retry_count = RETRY_MAX
+            current_rating = bot.update_rating()
+            print(f"The current rating is: {current_rating}")
             bot.get_game()
             print(bot.color)
             if bot.color == 'w':

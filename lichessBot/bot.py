@@ -47,6 +47,19 @@ class LichessBot:
         self.board = None
         self.uci_interpreter = None
 
+    def update_rating(self):
+        try:
+            account_info = requests.get("https://lichess.org/api/account",
+                headers=self.headers
+            )
+        except Exception:
+            raise RuntimeError("Rating retrieval unsuccessful")
+
+        account_info = account_info.json()
+
+        self.cur_rating = account_info['perfs'][self.time_control]['rating']
+        return self.cur_rating
+
     def choose_in_challenges(self, challenge_list_resp) -> str:
         challenge_list = challenge_list_resp.json()
         for challenge in challenge_list['in']:
