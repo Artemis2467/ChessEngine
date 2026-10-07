@@ -12,7 +12,7 @@ API_TOKEN = os.getenv("API_TOKEN")
 END_STATUS = {'aborted', 'mate', 'resign', 'stalemate', 'timeout', 'draw', 'outoftime', 'cheat', 'noStart', 'unknownFinish', 'insufficientMaterialClaim'}
 
 class LichessBot:
-    def __init__(self, base_time: int, increment: int, cur_rating: int, rating_range: int = 100, batch_size: int = 3, is_rated: bool = True):
+    def __init__(self, base_time: int, increment: int, rating_range: int = 100, batch_size: int = 3, is_rated: bool = True):
         """base_time and increment are counted by seconds"""
 
         self.headers = {'Authorization': f'Bearer {API_TOKEN}'}
@@ -35,7 +35,7 @@ class LichessBot:
         elif estimated_seconds >= 1500:
             self.time_control = 'classical'
 
-        self.cur_rating = cur_rating
+        self.cur_rating = None
         self.rating_range = rating_range
 
         self.batch_size = batch_size

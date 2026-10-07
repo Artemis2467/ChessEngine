@@ -4,7 +4,7 @@ from environment.board import Board
 class Uci:
     def __init__(self, board: Board):
         self.board = board
-        self.game_sequence = []
+        self.game_sequence:list[str] = []
         horizontal_axis = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
         self.int_to_cord = {i + 1: f'{horizontal_axis[i % 8]}{8 - i // 8}' for i in range(64)}
         self.cord_to_int = {cord: int_ for int_, cord in self.int_to_cord.items()}
